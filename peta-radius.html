@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peta Radius Jangkauan - GeoLayout</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --primary: #2c3e50; --accent: #8e44ad; --bg-dark: #2f3640; --sidebar-bg: #f5f6fa; --border-color: #dcdde1; }
+        body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: Arial, Helvetica, sans-serif; background-color: var(--bg-dark); overflow: hidden; }
+
+        /* Area Sidebar */
+        #sidebar { width: 390px; background: var(--sidebar-bg); padding: 15px; box-shadow: 2px 0 10px rgba(0,0,0,0.2); overflow-y: auto; box-sizing: border-box; z-index: 1000; border-right: 1px solid var(--border-color); }
+        .back-link { display: inline-block; margin-bottom: 15px; color: #8e44ad; text-decoration: none; font-size: 12px; font-weight: bold; background: #f4ecf7; padding: 6px 12px; border-radius: 4px;}
+        .back-link:hover { background: #8e44ad; color: white; }
+        
+        .brand-title { font-size: 14px; font-weight: bold; color: #2c3e50; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; text-transform: uppercase; }
+        .control-card { background: #ffffff; border: 1px solid var(--border-color); border-radius: 4px; padding: 12px 10px; margin-bottom: 12px; position: relative;}
+        .card-step-title { margin: 0 0 10px 0; font-size: 11px; color: var(--accent); border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase; font-weight: bold; }
+        
+        .form-group { margin-bottom: 8px; }
+        .form-group:last-child { margin-bottom: 0; }
+        .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
+        .form-group select, .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
+        .form-group select:focus, .form-group input:focus { border-color: var(--accent); outline: none; }
+
+        /* Area Kanvas Peta Cetak ala QGIS Layout */
+        #map-container { flex-grow: 1; height: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: center; align-items: center; background: #1e272e; overflow: auto; }
+        .qgis-layout-sheet { width: 900px; height: 590px; background: white; border: 3px solid #000000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: grid; grid-template-rows: 65px 1fr; grid-template-columns: 1fr 210px; box-sizing: border-box; position: relative; }
+        
+        .qgis-header { grid-column: 1 / -1; border-bottom: 2px solid #000000; padding: 6px 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: #ffffff; }
+        .qgis-header h1 { margin: 0; font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Times New Roman', Times, serif; color: #000; }
+        .qgis-header p { margin: 2px 0 0 0; font-size: 10px; color: #444; font-family: Arial, sans-serif; }
+        
+        .map-frame-wrapper { grid-row: 2 / 3; grid-column: 1 / 2; position: relative; background: #fff; border-right: 2px solid #000000; box-sizing: border-box; padding: 35px; }
+        #map { width: 100%; height: 100%; border: 1.5px solid #000000; box-sizing: border-box; background: #fff; }
+
+        /* Border Zebra Hitam-Putih */
+        .border-zebra-top, .border-zebra-bottom { position: absolute; left: 35px; right: 35px; height: 5px; background: repeating-linear-gradient(90deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
+        .border-zebra-top { top: 30px; } .border-zebra-bottom { bottom: 30px; }
+        .border-zebra-left, .border-zebra-right { position: absolute; top: 35px; bottom: 35px; width: 5px; background: repeating-linear-gradient(0deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
+        .border-zebra-left { left: 30px; } .border-zebra-right { right: 30px; }
+
+        /* Label Koordinat di LUAR Frame Peta */
+        .qgis-border-label { position: absolute; font-size: 8px; font-weight: bold; color: #000; background: #ffffff; padding: 1px 2px; z-index: 999; pointer-events: none; font-family: 'Courier New', Courier, monospace; }
+        .label-top { top: 15px; transform: translateX(-50%); } .label-bottom { bottom: 15px; transform: translateX(-50%); }
+        .label-left { left: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg); white-space: nowrap; }
+        .label-right { right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); white-space: nowrap; }
+
+        .leaflet-control-attribution { display: none !important; }
+
+        /* Panel Samping Layout */
+        .qgis-side-panel { grid-row: 2 / 3; grid-column: 2 / 3; background: #fff; padding: 8px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; font-size: 10px; overflow-y: auto; }
+        .map-element { border: 1px solid #000000; border-radius: 2px; padding: 5px; background: #fff; }
+        .map-element h4 { margin: 0 0 3px 0; font-size: 9px; border-bottom: 1px solid #000000; padding-bottom: 2px; text-align: center; font-weight: bold; color: #000000; text-transform: uppercase; }
+        .north-arrow { text-align: center; font-size: 15px; font-weight: bold; }
+
+        /* Tombol Aksi */
+        .btn-action { color: white; border: none; padding: 8px; width: 100%; font-weight: bold; border-radius: 4px; cursor: pointer; text-align: center; margin-top: 6px; font-size: 11px; transition: background 0.2s; }
+        .btn-png { background: #27ae60; } .btn-png:hover { background: #219653; }
+        .btn-pdf { background: #c0392b; } .btn-pdf:hover { background: #a93226; }
+        .btn-marker { background: #8e44ad; margin-bottom: 4px; } .btn-marker:hover { background: #732d91; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 0; }
+            body { background: none; height: 100vh; width: 100vw; }
+            #sidebar { display: none !important; }
+            #map-container { padding: 0 !important; background: none !important; width: 100vw !important; height: 100vh !important; }
+            .qgis-layout-sheet { width: 100vw !important; height: 100vh !important; box-shadow: none !important; border: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <a href="index.html" class="back-link">← Kembali ke Dashboard Utama</a>
+        <h2 class="brand-title" style="color: var(--accent); border-color: var(--accent);">🎯 Modul Analisis Radius</h2>
+        
+        <!-- STEP 1: LOKASI DASAR PETA -->
+        <div class="control-card">
+            <h3 class="card-step-title">1. Peta Latar & Lokasi</h3>
+            <div class="form-group">
+                <label>Pilih Basemap Dasar</label>
+                <select id="select-basemap">
+                    <option value="osm">OpenStreetMap Standard</option>
+                    <option value="positron">CartoDB Positron (Bersih/Terang)</option>
+                    <option value="dark">CartoDB Dark (Gelap)</option>
+                    <option value="satellite">Esri World Imagery</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 5px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Provinsi (Opsional)</label>
+                    <select id="select-provinsi"><option value="">-- Pilih Provinsi --</option></select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Batas Administrasi</label>
+                    <select id="select-show-kab">
+                        <option value="ya">Tampilkan Garis</option>
+                        <option value="tidak">Sembunyikan</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: IDENTITAS -->
+        <div class="control-card">
+            <h3 class="card-step-title">2. Identitas Peta</h3>
+            <div class="form-group"><label>Judul Utama Peta</label><input type="text" id="input-judul" value="PETA ANALISIS RADIUS JANGKAUAN"></div>
+            <div class="form-group"><label>Sub Judul / Keterangan</label><input type="text" id="input-subjudul" value="Pemetaan Buffer Zone dan Cakupan Wilayah"></div>
+        </div>
+
+        <!-- STEP 3: ANALISIS BUFFER / RADIUS -->
+        <div class="control-card" style="border: 2px solid var(--accent);">
+            <h3 class="card-step-title">3. Penentuan Radius (Buffer)</h3>
+            <div class="form-group">
+                <label>Nama Titik Pusat (Misal: RSUD Kota)</label>
+                <input type="text" id="input-buffer-label" value="Titik Pusat Pelayanan">
+            </div>
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Jangkauan Radius (Kilometer)</label>
+                    <input type="number" id="input-radius" value="5" min="0.1" step="0.5">
+                </div>
+                <div class="form-group" style="width: 70px;">
+                    <label>Warna Area</label>
+                    <input type="color" id="input-buffer-color" value="#8e44ad" style="height: 28px; cursor: pointer; padding:0;">
+                </div>
+            </div>
+            <button class="btn-action btn-marker" onclick="toggleBufferMode()">🎯 Klik Peta Untuk Buat Radius</button>
+            <p style="font-size:8px; color:#7f8c8d; text-align:center; margin: 4px 0 0;">(Klik pada peta untuk menaruh titik, lingkaran jangkauan akan terbentuk otomatis)</p>
+        </div>
+
+        <div class="control-card">
+            <div style="display: flex; gap: 5px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Bentuk Grid Koordinat</label>
+                    <select id="select-border">
+                        <option value="standar">Standar</option>
+                        <option value="zebra">Gaya Zebra</option>
+                        <option value="grid-saja">Hanya Grid</option>
+                        <option value="tidak">Tanpa Grid</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Skala Dinamis</label>
+                    <input type="text" value="Otomatis (Sesuai Zoom)" disabled>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()">📥 Download Kanvas Peta (PNG)</button>
+        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">🖨️ Cetak / Ekspor PDF</button>
+    </div>
+
+    <!-- Kanvas Peta -->
+    <div id="map-container">
+        <div class="qgis-layout-sheet" id="layoutSheet">
+            <div class="qgis-header">
+                <h1 id="header-judul">PETA ANALISIS RADIUS JANGKAUAN</h1>
+                <p id="header-subjudul">Pemetaan Buffer Zone dan Cakupan Wilayah</p>
+            </div>
+            
+            <div class="map-frame-wrapper">
+                <div id="map"></div>
+                <div id="border-labels-container"></div>
+                <div class="border-zebra-top" id="zebra-t"></div>
+                <div class="border-zebra-bottom" id="zebra-b"></div>
+                <div class="border-zebra-left" id="zebra-l"></div>
+                <div class="border-zebra-right" id="zebra-r"></div>
+            </div>
+
+            <div class="qgis-side-panel">
+                <div class="map-element">
+                    <h4>ARAH UTARA</h4>
+                    <div class="north-arrow">N ▲</div>
+                </div>
+                <div class="map-element">
+                    <h4>SKALA PETA</h4>
+                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">1 : 50.000</div>
+                </div>
+                <div class="map-element">
+                    <h4>KETERANGAN</h4>
+                    <div id="info-wilayah" style="line-height: 1.3; color: #000;">
+                        <b>Proyeksi:</b> WGS 84
+                    </div>
+                </div>
+                <div class="map-element" style="flex-grow:1;">
+                    <h4>LEGENDA RADIUS</h4>
+                    <div id="dynamic-legend" style="margin-top: 4px; line-height: 1.4; color: #000;">
+                        <i>Buat radius di peta untuk menampilkan legenda...</i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-latlng-graticule@1.2.0/L.latLngGraticule.js"></script>
+    <!-- html2canvas & jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        // Update Judul
+        document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
+        document.getElementById('input-subjudul').addEventListener('input', e => document.getElementById('header-subjudul').innerText = e.target.value);
+
+        // Inisialisasi Peta (preferCanvas untuk fix bug export)
+        var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
+        
+        const basemaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
+            positron: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true })
+        };
+        var currentBasemap = basemaps.osm.addTo(map);
+
+        document.getElementById('select-basemap').addEventListener('change', function() {
+            map.removeLayer(currentBasemap);
+            currentBasemap = (basemaps[this.value] || basemaps.osm).addTo(map);
+        });
+
+        L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+
+        function updateDynamicScale() {
+            let zoom = map.getZoom(), centerLat = map.getCenter().lat;
+            let scaleDenominator = Math.round(591657550.5 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, zoom));
+            document.getElementById('display-skala').innerText = `1 : ${scaleDenominator.toLocaleString('id-ID')}`;
+        }
+        map.on('zoomend moveend', function() { updateDynamicScale(); renderBorderCoordinates(); });
+
+        // --- BORDER & GRID ---
+        const borderContainer = document.getElementById('border-labels-container');
+        var graticuleLayer = null;
+
+        function renderBorderCoordinates() {
+            borderContainer.innerHTML = '';
+            let mode = document.getElementById('select-border').value;
+            ['zebra-t','zebra-b','zebra-l','zebra-r'].forEach(id => document.getElementById(id).style.display = (mode === 'zebra') ? 'block' : 'none');
+
+            if (mode === 'tidak' || mode === 'grid-saja') return;
+            let bounds = map.getBounds(), sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+            let steps = 4, latStep = (ne.lat - sw.lat) / (steps + 1), lngStep = (ne.lng - sw.lng) / (steps + 1);
+
+            for (let i = 1; i <= steps; i++) {
+                let latVal = sw.lat + latStep * i, topPercent = (i / (steps + 1)) * 100;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-left" style="top:${topPercent}%">${latVal.toFixed(2)}°S</div>`;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-right" style="top:${topPercent}%">${latVal.toFixed(2)}°S</div>`;
+            }
+            for (let j = 1; j <= steps; j++) {
+                let lngVal = sw.lng + lngStep * j, leftPercent = (j / (steps + 1)) * 100;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-top" style="left:${leftPercent}%">${lngVal.toFixed(2)}°E</div>`;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-bottom" style="left:${leftPercent}%">${lngVal.toFixed(2)}°E</div>`;
+            }
+        }
+
+        function setupGraticule() {
+            if (graticuleLayer) map.removeLayer(graticuleLayer);
+            let mode = document.getElementById('select-border').value;
+            if (mode !== 'tidak' && typeof L.latLngGraticule === 'function') {
+                graticuleLayer = L.latLngGraticule({
+                    showLabel: false, color: '#000000', weight: 0.5, dashArray: [4, 4],
+                    zoomInterval: [{start: 2, end: 4, latInterval: 10, lngInterval: 10}, {start: 5, end: 7, latInterval: 1, lngInterval: 1}, {start: 8, end: 18, latInterval: 0.2, lngInterval: 0.2}]
+                }).addTo(map);
+            }
+            renderBorderCoordinates();
+        }
+        setupGraticule();
+        document.getElementById('select-border').addEventListener('change', setupGraticule);
+
+        // --- FITUR ANALISIS BUFFER / RADIUS ---
+        let isAddingBuffer = false;
+        let bufferList = []; // Menyimpan objek titik dan lingkarannya
+        let bufferCounter = 0;
+
+        function toggleBufferMode() {
+            isAddingBuffer = !isAddingBuffer;
+            const btn = document.querySelector('.btn-marker');
+            if (isAddingBuffer) {
+                btn.style.background = '#e74c3c'; btn.innerText = '🛑 Batalkan Mode Titik Radius'; map.getContainer().style.cursor = 'crosshair';
+            } else {
+                btn.style.background = '#8e44ad'; btn.innerText = '🎯 Klik Peta Untuk Buat Radius'; map.getContainer().style.cursor = '';
+            }
+        }
+
+        map.on('click', function(e) {
+            if (!isAddingBuffer) return;
+            
+            let labelText = document.getElementById('input-buffer-label').value.trim() || `Titik Lokasi ${bufferList.length + 1}`;
+            let radiusKm = parseFloat(document.getElementById('input-radius').value) || 5;
+            let color = document.getElementById('input-buffer-color').value;
+            let currentId = bufferCounter++;
+
+            // 1. Buat Marker Pusat (Titik)
+            let iconHtml = `<div style="width:12px; height:12px; background:#fff; border:3px solid ${color}; border-radius:50%; box-shadow:0 0 4px #000;"></div>`;
+            let customIcon = L.divIcon({ className: 'custom-map-icon', html: iconHtml, iconSize: [18, 18], iconAnchor: [9, 9] });
+            let centerMarker = L.marker(e.latlng, { icon: customIcon }).addTo(map);
+
+            // 2. Buat Lingkaran Jangkauan (Buffer / Circle) Leaflet membaca radius dalam hitungan METER
+            let radiusMeters = radiusKm * 1000;
+            let bufferCircle = L.circle(e.latlng, {
+                radius: radiusMeters,
+                color: color,
+                weight: 2,
+                dashArray: '5, 5', // Garis pinggir putus-putus
+                fillColor: color,
+                fillOpacity: 0.25
+            }).addTo(map);
+            
+            centerMarker.bindPopup(`<b>${labelText}</b><br>Jangkauan: ${radiusKm} Km<br><br><button onclick="removeBuffer(${currentId})" style="background:#e74c3c; color:#fff; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; width:100%;">🗑️ Hapus Area Ini</button>`);
+
+            bufferList.push({ id: currentId, label: labelText, radius: radiusKm, color: color, marker: centerMarker, circle: bufferCircle });
+            updateLegend(); toggleBufferMode();
+        });
+
+        window.removeBuffer = function(id) {
+            let index = bufferList.findIndex(b => b.id === id);
+            if (index !== -1) { 
+                map.removeLayer(bufferList[index].marker); 
+                map.removeLayer(bufferList[index].circle); 
+                bufferList.splice(index, 1); 
+                updateLegend(); 
+            }
+        };
+
+        // --- DATA LATAR BELAKANG ADMINISTRASI (OPSIONAL) ---
+        let kabupatenData = null, adminLayer = null;
+        const selectProvinsi = document.getElementById('select-provinsi');
+        const selectShowKab = document.getElementById('select-show-kab');
+        const dynamicLegend = document.getElementById('dynamic-legend');
+
+        fetch('data/38 Provinsi Indonesia - Kabupaten.json').then(res => res.json()).then(data => {
+            kabupatenData = data;
+            let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
+            provinselects = provinces;
+            provinces.forEach(prov => {
+                let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
+            });
+        });
+
+        function updateLegend() {
+            let html = '';
+            
+            if(selectProvinsi.value && selectShowKab.value === 'ya') {
+                html += `<span style="display:inline-block; width:10px; height:2px; background:#444; vertical-align:middle;"></span> Batas Wilayah Administrasi<br><hr style="border:0; border-top:1px dashed #ccc; margin:4px 0;">`;
+            }
+
+            if(bufferList.length === 0) {
+                html += `<i>Buat area radius di peta...</i>`;
+            } else {
+                bufferList.forEach(b => {
+                    html += `
+                    <div style="margin-top:4px; display:flex; align-items:center; gap:6px;">
+                        <div style="width:14px; height:14px; background:${b.color}40; border:1px dashed ${b.color}; border-radius:50%; position:relative; display:flex; justify-content:center; align-items:center;">
+                            <div style="width:4px; height:4px; background:#fff; border:1px solid ${b.color}; border-radius:50%;"></div>
+                        </div>
+                        <span><b>${b.label}</b> (Radius: ${b.radius} Km)</span>
+                    </div>`;
+                });
+            }
+            dynamicLegend.innerHTML = html;
+        }
+
+        function updateAdminLayer() {
+            let selectedProv = selectProvinsi.value;
+            let showKab = selectShowKab.value === 'ya';
+
+            if (adminLayer) map.removeLayer(adminLayer);
+            updateLegend();
+
+            if (selectedProv && kabupatenData) {
+                adminLayer = L.geoJSON(kabupatenData, {
+                    filter: f => f.properties.WADMPR === selectedProv,
+                    style: { color: "#34495e", weight: showKab ? 1.5 : 0, fillColor: "transparent", fillOpacity: 0 },
+                    interactive: false // Agar tidak mengganggu klik radius
+                }).addTo(map);
+
+                // Auto zoom ke wilayah jika belum ada radius
+                if(bufferList.length === 0 && adminLayer.getLayers().length > 0) {
+                    map.fitBounds(adminLayer.getBounds());
+                }
+            }
+        }
+
+        selectProvinsi.addEventListener('change', updateAdminLayer);
+        selectShowKab.addEventListener('change', updateAdminLayer);
+
+        // --- EKSPOR PDF/PNG ---
+        function exportToPNG() {
+            const btn = document.getElementById('btn-export-png');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Memproses Ekspor...";
+            setTimeout(() => {
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, allowTaint: false, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                    let link = document.createElement('a'); link.download = 'Peta-Radius.png'; link.href = canvas.toDataURL('image/png'); link.click();
+                    btn.innerText = originalText;
+                }).catch(err => { alert("Gagal mengekspor: " + err.message); btn.innerText = originalText; });
+            }, 600); 
+        }
+
+        function exportToPDF() {
+            const btn = document.getElementById('btn-export-pdf');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Memproses PDF...";
+            setTimeout(() => {
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, allowTaint: false, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('l', 'mm', 'a4');
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
+                    pdf.save('Peta-Radius.pdf');
+                    btn.innerText = originalText;
+                }).catch(err => { alert("Gagal mengekspor: " + err.message); btn.innerText = originalText; });
+            }, 600);
+        }
+    </script>
+</body>
+</html>
