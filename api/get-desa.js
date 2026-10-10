@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // PENCARIAN KETAT: Hanya mencari di kolom wadmkk (Kabupaten/Kota)
+        // Menggunakan WADMKK untuk filter kabupaten dan mengambil semua data wilayahnya
         const query = `
             SELECT jsonb_build_object(
                 'type',     'FeatureCollection',
@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
               ) AS feature
               FROM (
                 SELECT * FROM batas_wilayah 
-                WHERE wadmkk ILIKE $1 
+                WHERE WADMKK ILIKE $1
               ) inputs
             ) features;
         `;
@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
         res.status(200).json(rows[0].geojson);
         
     } catch (error) {
-        console.error(error);
+        console.error("Database Error:", error);
         res.status(500).json({ error: "Gagal mengambil data dari database" });
     }
 };

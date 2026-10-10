@@ -696,7 +696,7 @@
                     desaDataLoaded = true;
                     selectDesa.classList.remove('loading');
                     msgLoading.style.display = 'none';
-                    populateDesaDropdown(); // Filter ganda terjadi di sini
+                    populateDesaDropdown();
                 })
                 .catch(err => {
                     msgLoading.innerText = 'Gagal memuat desa dari database (Cek koneksi API).';
@@ -705,33 +705,18 @@
                 });
         });
 
-        // FILTER GANDA DI JAVASCRIPT: Menolak nama desa jika kolom kabupaten tidak cocok
+        // POPULATE DROPDOWN MENGGUNAKAN KOLOM WADMKD (KELURAHAN/DESA)
         function populateDesaDropdown() {
             selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
             if (!desaData || !desaData.features) return;
             
-            let selectedKab = selectKabupaten.value.toLowerCase();
             let desaSet = new Set();
-            
             desaData.features.forEach(f => {
-                let p = f.properties;
-                // Ambil nilai kolom wadmkk (berbagai variasi huruf kapital di DB)
-                let wadmkk = (p.WADMKK || p.wadmkk || p.KABUPATEN || p.kabupaten || '').toLowerCase();
-                let namaDesa = p.NAMOBJ || p.namobj;
-                
-                // Pastikan nama kabupaten dari baris data COCOK dengan kabupaten yang dipilih
-                if (wadmkk.includes(selectedKab) || selectedKab.includes(wadmkk)) {
+                if (f.properties) {
+                    let namaDesa = f.properties.WADMKD || f.properties.wadmkd;
                     if (namaDesa) desaSet.add(namaDesa);
                 }
             });
-
-            // Fallback (jika gagal filter ketat karena nama kolom beda sama sekali)
-            if (desaSet.size === 0) {
-                desaData.features.forEach(f => {
-                    let namaDesa = f.properties.NAMOBJ || f.properties.namobj;
-                    if (namaDesa) desaSet.add(namaDesa);
-                });
-            }
 
             Array.from(desaSet).sort().forEach(desa => {
                 let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
@@ -743,7 +728,7 @@
 
         ['select-show-kab', 'select-show-label', 'select-masking', 'input-fill-color', 'select-symbology', 'select-opacity', 'select-weight', 'select-dash', 'select-label-color', 'select-label-size'].forEach(id => document.getElementById(id).addEventListener('change', updateMapDisplay));
 
-        // --- UPDATE TAMPILAN PETA (FILTER DESA) ---
+        // --- UPDATE TAMPILAN PETA ---
         function updateMapDisplay() {
             let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
             let showKabLines = selectShowKab.value === 'ya', showLabels = selectShowLabel.value === 'ya', maskMode = selectMasking.value;
@@ -771,19 +756,17 @@
                 miniMap.setView([-0.7893, 113.9213], 4); return;
             }
 
-            // Tampilkan Desa & Pastikan hanya desa milik Kabupaten yang dipilih
+            // Tampilkan Desa yang dipilih menggunakan WADMKD
             if (selectedDesa && desaDataLoaded && desaData) {
                 infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Desa/Kel:</b> ${selectedDesa}<br><b>Proyeksi:</b> WGS 84`;
                 updateLegend();
 
                 layerDesa = L.geoJSON(desaData, {
                     filter: function(f) { 
+                        if (!f.properties) return false;
                         let p = f.properties;
-                        let wadmkk = (p.WADMKK || p.wadmkk || p.KABUPATEN || p.kabupaten || '').toLowerCase();
-                        let targetKab = selectedKab.toLowerCase();
-                        let isMatchKab = wadmkk.includes(targetKab) || targetKab.includes(wadmkk);
-                        let isMatchDesa = (p.NAMOBJ || p.namobj) === selectedDesa;
-                        return isMatchDesa && isMatchKab; 
+                        let namaDesa = p.WADMKD || p.wadmkd;
+                        return namaDesa === selectedDesa; 
                     },
                     style: { color: "#2c3e50", weight: 2, fillColor: fillColor, fillOpacity: opacityVal },
                     onEachFeature: function(feature, layer) {
