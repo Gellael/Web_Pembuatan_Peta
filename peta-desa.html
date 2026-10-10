@@ -24,7 +24,7 @@
         .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
         .form-group select, .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
         .form-group select:focus, .form-group input:focus { border-color: var(--accent); outline: none; }
-        select.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
+        select.loading, input.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
 
         /* Area Kanvas Peta Cetak ala QGIS Layout */
         #map-container { flex-grow: 1; height: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: center; align-items: center; background: #1e272e; overflow: auto; }
@@ -340,17 +340,18 @@
         document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
         document.getElementById('input-subjudul').addEventListener('input', e => document.getElementById('header-subjudul').innerText = e.target.value);
 
-        const colorPalette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
+        // --- INISIALISASI PETA UTAMA ---
+        var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
+        let labelLayer = L.layerGroup().addTo(map);
+
         let kabupatenData = null, desaData = null;
-        let activeLayer = null, maskLayer = null, layerDesa = null;
-        let labelLayer = L.layerGroup().addTo(map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5));
+        let layerDesa = null;
 
         const selectProvinsi = document.getElementById('select-provinsi');
         const selectKabupaten = document.getElementById('select-kabupaten');
         const inputSearchDesa = document.getElementById('input-search-desa');
         const listDesa = document.getElementById('list-desa');
         const msgLoading = document.getElementById('desa-loading-msg');
-
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
@@ -381,7 +382,7 @@
             selectKabupaten.disabled = false;
         });
 
-        // 2. Ketika Kabupaten dipilih, ambil data desa dari API (Stabil dan tidak error DB)
+        // 2. Ketika Kabupaten dipilih, ambil data desa dari API
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             inputSearchDesa.value = '';
@@ -464,10 +465,13 @@
             }
         });
 
-        // --- BASICS & EKSPOR ---
+        // --- BASES & EKSPOR ---
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
-            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true })
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }),
+            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, crossOrigin: true }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            positron: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true })
         };
         let currentBasemap = basemaps.osm.addTo(map);
         document.getElementById('select-basemap').addEventListener('change', function() {
