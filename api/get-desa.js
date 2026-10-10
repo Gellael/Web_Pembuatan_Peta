@@ -17,25 +17,26 @@ module.exports = async (req, res) => {
 
     try {
         if (!provinsi) {
-            // Ambil daftar provinsi unik dari database
+            // Mencari kolom provinsi dengan berbagai kemungkinan nama/huruf
             const queryProv = `
-                SELECT DISTINCT "WADMPR" AS provinsi 
+                SELECT DISTINCT COALESCE(wadmpr, WADMPR, provinsi, PROVINSI, '') AS provinsi 
                 FROM batas_wilayah 
-                WHERE "WADMPR" IS NOT NULL 
+                WHERE COALESCE(wadmpr, WADMPR, provinsi, PROVINSI, '') != '' 
                 ORDER BY provinsi ASC;
             `;
             const { rows } = await pool.query(queryProv);
-            return res.status(200).json(rows.map(r => r.provinsi));
+            return res.status(200).json(rows.map(r => r.provinsi).filter(Boolean));
         } else {
-            // Ambil daftar kabupaten/kota unik berdasarkan provinsi yang dipilih
+            // Mencari kolom kabupaten berdasarkan provinsi
             const queryKab = `
-                SELECT DISTINCT "WADMKK" AS kabupaten 
+                SELECT DISTINCT COALESCE(wadmkk, WADMKK, kabupaten, KABUPATEN, '') AS kabupaten 
                 FROM batas_wilayah 
-                WHERE "WADMPR" ILIKE $1 AND "WADMKK" IS NOT NULL 
+                WHERE (wadmpr ILIKE $1 OR WADMPR ILIKE $1 OR provinsi ILIKE $1 OR PROVINSI ILIKE $1)
+                  AND COALESCE(wadmkk, WADMKK, kabupaten, KABUPATEN, '') != '' 
                 ORDER BY kabupaten ASC;
             `;
             const { rows } = await pool.query(queryKab, [provinsi]);
-            return res.status(200).json(rows.map(r => r.kabupaten));
+            return res.status(200).json(rows.map(r => r.kabupaten).filter(Boolean));
         }
     } catch (error) {
         console.error("Database Error:", error);
