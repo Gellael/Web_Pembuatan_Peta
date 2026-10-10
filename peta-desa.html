@@ -24,6 +24,8 @@
         .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
         .form-group select, .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
         .form-group select:focus, .form-group input:focus { border-color: var(--accent); outline: none; }
+        /* Style untuk status loading pada select */
+        select.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
 
         /* Area Kanvas Peta Cetak ala QGIS Layout */
         #map-container { flex-grow: 1; height: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: center; align-items: center; background: #1e272e; overflow: auto; }
@@ -93,9 +95,12 @@
             </div>
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
                 <label style="color: #d35400;">📍 Kelurahan / Desa</label>
-                <select id="select-desa" disabled>
-                    <option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>
+                <!-- Tambahkan indikator loading awal pada select -->
+                <select id="select-desa" disabled class="loading">
+                    <option value="">-- Memuat Data Desa... --</option>
                 </select>
+                <!-- Menambahkan pesan kecil jika data besar -->
+                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: block; margin-top: 4px;">Sedang memuat database desa, mohon tunggu...</small>
             </div>
         </div>
 
@@ -363,6 +368,7 @@
         const colorPalette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
         let currentDistrictList = []; 
         let currentGeoJsonFeatures = [];
+        let desaDataLoaded = false; // Flag untuk status loading desa
 
         // Kontrol Skala
         const selectSkalaMode = document.getElementById('select-skala-mode');
@@ -626,6 +632,7 @@
         const selectLabelColor = document.getElementById('select-label-color');
         const selectLabelSize = document.getElementById('select-label-size');
         const inputFillColor = document.getElementById('input-fill-color');
+        const desaLoadingMsg = document.getElementById('desa-loading-msg');
         
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
@@ -646,8 +653,54 @@
         // 2. Load Data Desa (Lazy Load / fetch di latar belakang tanpa memberatkan UI awal)
         fetch('data/peta-perdesa.geojson')
             .then(res => res.json())
-            .then(data => { desaData = data; })
-            .catch(err => { console.error("Gagal memuat JSON Desa:", err); });
+            .then(data => { 
+                desaData = data; 
+                desaDataLoaded = true; // Tandai data desa sudah dimuat
+                desaLoadingMsg.style.display = 'none'; // Sembunyikan pesan loading
+
+                // Jika Kabupaten sudah dipilih sebelumnya, aktifkan select desa dan populate option
+                let selectedKab = selectKabupaten.value;
+                if(selectedKab) {
+                    populateDesaDropdown(selectedKab);
+                } else {
+                    selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
+                    selectDesa.classList.remove('loading');
+                }
+            })
+            .catch(err => { 
+                console.error("Gagal memuat JSON Desa:", err);
+                desaLoadingMsg.innerText = "Gagal memuat database desa.";
+                desaLoadingMsg.style.color = "red";
+            });
+
+        // Fungsi pembantu untuk mengisi dropdown desa
+        function populateDesaDropdown(selectedKab) {
+            selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
+            selectDesa.disabled = true;
+            selectDesa.classList.remove('loading');
+            
+            if (!selectedKab || !desaDataLoaded || !desaData) return;
+
+            // Filter desa hanya berdasarkan kabupaten yang sedang dipilih
+            let desaSet = new Set();
+            desaData.features.forEach(f => {
+                let namaKabF = f.properties.WADMKK || f.properties.REMARK || f.properties.KABUPATEN;
+                if (namaKabF && namaKabF.toLowerCase().includes(selectedKab.toLowerCase()) && f.properties.NAMOBJ) {
+                    desaSet.add(f.properties.NAMOBJ);
+                }
+            });
+
+            // Jika filter spesifik kosong, tampilkan seluruh desa dari file desaData sebagai opsi cadangan
+            if (desaSet.size === 0) {
+                desaData.features.forEach(f => { if(f.properties.NAMOBJ) desaSet.add(f.properties.NAMOBJ); });
+            }
+
+            let daftarDesa = Array.from(desaSet).sort();
+            daftarDesa.forEach(desa => {
+                let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
+            });
+            selectDesa.disabled = false;
+        }
 
         // --- UPDATE LEGENDA ---
         function updateLegend() {
@@ -802,7 +855,17 @@
         selectProvinsi.addEventListener('change', function() {
             let selectedProv = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>'; selectKabupaten.disabled = true;
-            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>'; selectDesa.disabled = true;
+            
+            // Reset state desa
+            if (!desaDataLoaded) {
+                selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
+                selectDesa.classList.add('loading');
+                selectDesa.disabled = true;
+            } else {
+                selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
+                selectDesa.classList.remove('loading');
+                selectDesa.disabled = true;
+            }
             
             if (!selectedProv || !kabupatenData) { updateMapDisplay(); return; }
 
@@ -816,29 +879,15 @@
 
         selectKabupaten.addEventListener('change', function() {
             let selectedKab = this.value;
-            selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; selectDesa.disabled = true;
             
-            if (!selectedKab || !desaData) { updateMapDisplay(); return; }
-
-            // Filter desa hanya berdasarkan kabupaten yang sedang dipilih
-            let desaSet = new Set();
-            desaData.features.forEach(f => {
-                let namaKabF = f.properties.WADMKK || f.properties.REMARK || f.properties.KABUPATEN;
-                if (namaKabF && namaKabF.toLowerCase().includes(selectedKab.toLowerCase()) && f.properties.NAMOBJ) {
-                    desaSet.add(f.properties.NAMOBJ);
-                }
-            });
-
-            // Jika filter spesifik kosong, tampilkan seluruh desa dari file desaData sebagai opsi cadangan
-            if (desaSet.size === 0) {
-                desaData.features.forEach(f => { if(f.properties.NAMOBJ) desaSet.add(f.properties.NAMOBJ); });
+            if (!desaDataLoaded) {
+                 selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
+                 selectDesa.classList.add('loading');
+                 selectDesa.disabled = true;
+            } else {
+                 populateDesaDropdown(selectedKab);
             }
-
-            let daftarDesa = Array.from(desaSet).sort();
-            daftarDesa.forEach(desa => {
-                let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
-            });
-            selectDesa.disabled = false;
+            
             updateMapDisplay();
         });
 
