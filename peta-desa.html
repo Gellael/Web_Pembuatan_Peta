@@ -24,7 +24,7 @@
         .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
         .form-group select, .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
         .form-group select:focus, .form-group input:focus { border-color: var(--accent); outline: none; }
-        select.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
+        input.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
 
         /* Area Kanvas Peta Cetak ala QGIS Layout */
         #map-container { flex-grow: 1; height: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: center; align-items: center; background: #1e272e; overflow: auto; }
@@ -81,27 +81,18 @@
         <a href="index.html" class="back-link">← Kembali ke Dashboard</a>
         <h2 class="brand-title">🗺️ Pembuat Peta Administrasi</h2>
         
-        <!-- STEP 1: LOKASI PETA -->
+        <!-- STEP 1: PENCARIAN KELURAHAN / DESA (Ganti Provinsi & Kota) -->
         <div class="control-card">
-            <h3 class="card-step-title">1. Lokasi Pemetaan</h3>
+            <h3 class="card-step-title">1. Cari Kelurahan / Desa</h3>
             <div class="form-group">
-                <label>Provinsi</label>
-                <select id="select-provinsi" class="loading"><option value="">-- Memuat Provinsi... --</option></select>
-            </div>
-            <div class="form-group">
-                <label>Kabupaten/Kota</label>
-                <select id="select-kabupaten" disabled><option value="">-- Pilih Provinsi Terlebih Dahulu --</option></select>
-            </div>
-            <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
-                <label style="color: #d35400;">📍 Kelurahan / Desa</label>
-                <select id="select-desa" disabled class="loading">
-                    <option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>
-                </select>
-                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: none; margin-top: 4px;">Sedang memuat data dari database...</small>
+                <label style="color: #d35400;">🔍 Ketik Nama Desa / Kelurahan</label>
+                <input type="text" id="input-search-desa" list="list-desa" placeholder="Contoh: Air Itam Timur..." class="loading" disabled autocomplete="off">
+                <datalist id="list-desa"></datalist>
+                <small id="desa-loading-msg" style="color: #2980b9; font-size: 8px; display: block; margin-top: 4px;">Sedang memuat data desa dari database...</small>
             </div>
         </div>
 
-        <!-- STEP 2: IDENTITAS -->
+        <!-- STEP 2: IDENTITAS PETA -->
         <div class="control-card">
             <h3 class="card-step-title">2. Identitas Peta</h3>
             <div class="form-group"><label>Judul Utama Peta</label><input type="text" id="input-judul" value="PETA ADMINISTRASI WILAYAH INDONESIA"></div>
@@ -111,14 +102,6 @@
         <!-- STEP 3: SIMBOLOGI & BATAS WILAYAH -->
         <div class="control-card">
             <h3 class="card-step-title">3. Simbologi & Batas Wilayah</h3>
-            <div class="form-group">
-                <label>Tipe Simbologi Warna</label>
-                <select id="select-symbology">
-                    <option value="single">Satu Warna Seragam</option>
-                    <option value="categorized" selected>Kategori Warna-Warni Poligon</option>
-                </select>
-            </div>
-            
             <div style="display: flex; gap: 5px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Warna Utama</label>
@@ -134,13 +117,13 @@
                     </select>
                 </div>
             </div>
-
             <div style="display: flex; gap: 5px; margin-top: 6px;">
                 <div class="form-group" style="flex: 1;">
-                    <label>Tampil Batas</label>
-                    <select id="select-show-kab">
-                        <option value="ya">Ya</option>
-                        <option value="tidak">Tidak</option>
+                    <label>Tebal Garis</label>
+                    <select id="select-weight">
+                        <option value="0.5">Tipis</option>
+                        <option value="1.5" selected>Sedang</option>
+                        <option value="3.0">Tebal</option>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1;">
@@ -149,14 +132,6 @@
                         <option value="">Solid (Lurus)</option>
                         <option value="5, 5">Dashed (Putus)</option>
                         <option value="1, 5">Dotted (Titik)</option>
-                    </select>
-                </div>
-                <div class="form-group" style="flex: 1;">
-                    <label>Tebal Garis</label>
-                    <select id="select-weight">
-                        <option value="0.5">Tipis</option>
-                        <option value="1.5" selected>Sedang</option>
-                        <option value="3.0">Tebal</option>
                     </select>
                 </div>
             </div>
@@ -188,14 +163,6 @@
                         <option value="besar">Besar</option>
                     </select>
                 </div>
-            </div>
-            <div class="form-group" style="margin-top: 6px;">
-                <label>Fokus Masking (Luar Wilayah)</label>
-                <select id="select-masking">
-                    <option value="none">Tidak Ada Masking (Tampil Semua)</option>
-                    <option value="dim" selected>Gelapkan Sekitar (Highlight)</option>
-                    <option value="solid">Potong Solid (Isolasi Area Terpilih)</option>
-                </select>
             </div>
         </div>
 
@@ -362,13 +329,14 @@
         document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
         document.getElementById('input-subjudul').addEventListener('input', e => document.getElementById('header-subjudul').innerText = e.target.value);
 
-        const colorPalette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
-        let currentDistrictList = []; 
-        let currentGeoJsonFeatures = [];
-        let desaDataLoaded = false; 
-        let kabupatenDataLocal = null;
+        let allDesaData = null;
+        let layerDesa = null;
+        let miniMapLayer = null;
+        let customMarkers = [], markerIdCounter = 0;
+        let customAnnotations = [], annotIdCounter = 0;
+        let isAddingMarker = false, isAddingAnnotation = false;
+        let currentUploadedImageBase64 = null;
 
-        // Kontrol Skala
         const selectSkalaMode = document.getElementById('select-skala-mode');
         const groupSkalaFix = document.getElementById('group-skala-fix');
         const inputSkalaFix = document.getElementById('input-skala-fix');
@@ -418,7 +386,6 @@
 
         var miniMap = L.map('mini-map-box', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, preferCanvas: true }).setView([-0.7893, 113.9213], 4);
         var miniMapBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13, crossOrigin: true }).addTo(miniMap);
-        let miniMapLayer = null;
 
         function updateMiniMapHighlight(geojsonData) {
             if (miniMapLayer) miniMap.removeLayer(miniMapLayer);
@@ -444,7 +411,6 @@
             borderContainer.innerHTML = '';
             let mode = document.getElementById('select-border').value;
             ['zebra-t','zebra-b','zebra-l','zebra-r'].forEach(id => document.getElementById(id).style.display = (mode === 'zebra') ? 'block' : 'none');
-
             if (mode === 'tidak' || mode === 'grid-saja') return;
             let bounds = map.getBounds(), sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
             let steps = 4, latStep = (ne.lat - sw.lat) / (steps + 1), lngStep = (ne.lng - sw.lng) / (steps + 1);
@@ -465,7 +431,6 @@
             if (graticuleLayer) map.removeLayer(graticuleLayer);
             let mode = document.getElementById('select-border').value;
             let gridColor = document.getElementById('select-grid-color').value;
-
             if (mode !== 'tidak' && typeof L.latLngGraticule === 'function') {
                 graticuleLayer = L.latLngGraticule({
                     showLabel: false, color: gridColor, weight: 0.5, dashArray: [4, 4],
@@ -478,11 +443,118 @@
         document.getElementById('select-border').addEventListener('change', setupGraticule);
         document.getElementById('select-grid-color').addEventListener('change', setupGraticule);
 
-        // --- SISTEM MARKER & ANOTASI ---
-        let isAddingMarker = false, customMarkers = [], markerIdCounter = 0;
-        let isAddingAnnotation = false, customAnnotations = [], annotIdCounter = 0;
-        let currentUploadedImageBase64 = null;
+        // --- PENCARIAN DESA LANGSUNG ---
+        const inputSearchDesa = document.getElementById('input-search-desa');
+        const listDesa = document.getElementById('list-desa');
+        const msgLoading = document.getElementById('desa-loading-msg');
+        const infoWilayah = document.getElementById('info-wilayah');
+        const dynamicLegend = document.getElementById('dynamic-legend');
+        let labelLayer = L.layerGroup().addTo(map);
 
+        function loadAllDesa() {
+            fetch('/api/get-all-desa')
+                .then(res => res.json())
+                .then(data => {
+                    allDesaData = data;
+                    listDesa.innerHTML = '';
+                    let desaSet = new Set();
+
+                    if (data && data.features) {
+                        data.features.forEach(f => {
+                            let p = f.properties;
+                            let namaDesa = p.WADMKD || p.wadmkd;
+                            let kab = p.WADMKK || p.wadmkk || '';
+                            if (namaDesa) {
+                                desaSet.add(namaDesa);
+                                let opt = document.createElement('option');
+                                opt.value = `${namaDesa} (${kab})`;
+                                listDesa.appendChild(opt);
+                            }
+                        });
+                    }
+
+                    inputSearchDesa.classList.remove('loading');
+                    inputSearchDesa.disabled = false;
+                    msgLoading.style.display = 'none';
+                })
+                .catch(err => {
+                    console.error("Gagal memuat data desa:", err);
+                    msgLoading.innerText = "Gagal memuat data desa dari database.";
+                    msgLoading.style.color = '#e74c3c';
+                });
+        }
+        loadAllDesa();
+
+        inputSearchDesa.addEventListener('input', function() {
+            let val = this.value.trim();
+            let cleanDesaName = val.split(' (')[0];
+            if (cleanDesaName.length >= 2) {
+                renderSelectedDesa(cleanDesaName);
+            }
+        });
+
+        function renderSelectedDesa(namaDesaTarget) {
+            if (!allDesaData || !allDesaData.features) return;
+
+            if (layerDesa) map.removeLayer(layerDesa);
+            labelLayer.clearLayers();
+
+            let fillColor = document.getElementById('input-fill-color').value;
+            let opacityVal = parseFloat(document.getElementById('select-opacity').value);
+            let weightVal = parseFloat(document.getElementById('select-weight').value);
+            let dashVal = document.getElementById('select-dash').value;
+            let showLabels = document.getElementById('select-show-label').value === 'ya';
+            let labelColor = document.getElementById('select-label-color').value;
+            let labelSize = document.getElementById('select-label-size').value;
+            
+            let fontColor = labelColor === 'putih' ? '#ffffff' : '#111111';
+            let outlineColor = labelColor === 'putih' ? '#111111' : '#ffffff';
+            let fontSize = labelSize === 'kecil' ? '7px' : (labelSize === 'besar' ? '12px' : '9px');
+            let textShadowStyle = `1px 1px 0 ${outlineColor}, -1px -1px 0 ${outlineColor}, 1px -1px 0 ${outlineColor}, -1px 1px 0 ${outlineColor}, 0px 0px 4px ${outlineColor}`;
+
+            layerDesa = L.geoJSON(allDesaData, {
+                filter: function(f) {
+                    if (!f.properties) return false;
+                    let p = f.properties;
+                    let des = p.WADMKD || p.wadmkd || '';
+                    return des.toLowerCase() === namaDesaTarget.toLowerCase();
+                },
+                style: { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal },
+                onEachFeature: function(feature, layer) {
+                    let p = feature.properties;
+                    let desa = p.WADMKD || p.wadmkd;
+                    let kab = p.WADMKK || p.wadmkk || '-';
+                    let prov = p.WADMPR || p.wadmpr || '-';
+
+                    infoWilayah.innerHTML = `<b>Provinsi:</b> ${prov}<br><b>Kab/Kota:</b> ${kab}<br><b>Desa/Kel:</b> ${desa}<br><b>Proyeksi:</b> WGS 84`;
+                    dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> Kel. ${desa}`;
+
+                    if (showLabels) {
+                        try {
+                            let pt = turf.pointOnFeature(feature);
+                            let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
+                            let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${desa}</div>`;
+                            let lbl = L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true });
+                            labelLayer.addLayer(lbl);
+                        } catch(e){}
+                    }
+                }
+            }).addTo(map);
+
+            if (layerDesa.getLayers().length > 0) {
+                map.fitBounds(layerDesa.getBounds());
+                updateMiniMapHighlight(layerDesa.toGeoJSON());
+            }
+        }
+
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                let currentVal = inputSearchDesa.value.trim().split(' (')[0];
+                if (currentVal) renderSelectedDesa(currentVal);
+            });
+        });
+
+        // --- SISTEM MARKER & ANOTASI ---
         document.getElementById('input-annot-img').addEventListener('change', function(e) {
             let file = e.target.files[0];
             if(file) {
@@ -497,451 +569,90 @@
         function updateToolButtons() {
             const btnMarker = document.querySelector('.btn-marker');
             const btnAnnot = document.querySelector('.btn-annot');
-            
             if (isAddingMarker) {
                 btnMarker.style.background = '#c0392b'; btnMarker.innerText = '🛑 Batalkan Mode Pin';
                 map.getContainer().style.cursor = 'crosshair';
             } else {
                 btnMarker.style.background = '#2980b9'; btnMarker.innerText = '📍 Klik Peta untuk Taruh Pin';
             }
-            
             if (isAddingAnnotation) {
                 btnAnnot.style.background = '#c0392b'; btnAnnot.innerText = '🛑 Batalkan Mode Anotasi';
                 map.getContainer().style.cursor = 'crosshair';
             } else {
                 btnAnnot.style.background = '#8e44ad'; btnAnnot.innerText = '🖼️ Klik Peta untuk Taruh Gambar';
             }
-            
             if (!isAddingMarker && !isAddingAnnotation) map.getContainer().style.cursor = '';
         }
 
-        function toggleMarkerMode() {
-            isAddingMarker = !isAddingMarker;
-            isAddingAnnotation = false;
-            updateToolButtons();
-        }
-
+        function toggleMarkerMode() { isAddingMarker = !isAddingMarker; isAddingAnnotation = false; updateToolButtons(); }
         function toggleAnnotationMode() {
-            if (!currentUploadedImageBase64 && !isAddingAnnotation) {
-                alert("Silakan pilih file gambar terlebih dahulu!");
-                return;
-            }
-            isAddingAnnotation = !isAddingAnnotation;
-            isAddingMarker = false;
-            updateToolButtons();
+            if (!currentUploadedImageBase64 && !isAddingAnnotation) { alert("Pilih file gambar dulu!"); return; }
+            isAddingAnnotation = !isAddingAnnotation; isAddingMarker = false; updateToolButtons();
         }
 
         function getMarkerHtml(shape, color, labelText = '') {
-            if (shape === 'circle') return `<div style="width: 12px; height: 12px; background: ${color}; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 3px rgba(0,0,0,0.5); display:inline-block; vertical-align:middle;"></div>`;
-            else if (shape === 'square') return `<div style="width: 12px; height: 12px; background: ${color}; border: 1px solid #fff; box-shadow: 0 0 3px rgba(0,0,0,0.5); display:inline-block; vertical-align:middle;"></div>`;
-            else if (shape === 'star') return `<span style="font-size: 14px; color: ${color}; text-shadow: 0 0 2px #333; display:inline-block; vertical-align:middle;">★</span>`;
-            else if (shape === 'triangle') return `<div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 12px solid ${color}; filter: drop-shadow(0 0 2px rgba(0,0,0,0.5)); display:inline-block; vertical-align:middle;"></div>`;
-            else if (shape === 'diamond') return `<div style="width: 10px; height: 10px; background: ${color}; border: 1px solid #fff; transform: rotate(45deg); box-shadow: 0 0 3px rgba(0,0,0,0.5); display:inline-block; vertical-align:middle;"></div>`;
-            else if (shape === 'cross') return `<span style="font-size: 14px; font-weight: bold; color: ${color}; text-shadow: 0 0 2px #fff; display:inline-block; vertical-align:middle;">✚</span>`;
-            else if (shape === 'exclamation') return `<span style="background: ${color}; color: #fff; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: bold; display:inline-flex; align-items:center; justify-content:center; border: 1px solid #fff; box-shadow: 0 0 3px rgba(0,0,0,0.5); vertical-align:middle;">!</span>`;
-            else if (shape === 'flag') return `<span style="font-size: 14px; color: ${color}; display:inline-block; vertical-align:middle;">🚩</span>`;
-            else if (shape === 'home') return `<span style="font-size: 14px; color: ${color}; display:inline-block; vertical-align:middle;">🏠</span>`;
-            else if (shape === 'pulse') return `<div style="width: 10px; height: 10px; background: ${color}; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 3px ${color}66; display:inline-block; vertical-align:middle;"></div>`;
-            else if (shape === 'bubble') return `<span style="background: ${color}; color: #fff; padding: 1px 4px; border-radius: 4px; font-size: 8px; font-weight: bold; border: 1px solid #fff; display:inline-block; vertical-align:middle;">${labelText}</span>`;
-            else return `<div style="width: 12px; height: 18px; background: ${color}; border: 1px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 0 3px rgba(0,0,0,0.5); display:inline-block; vertical-align:middle; margin:2px;"></div>`;
+            if (shape === 'circle') return `<div style="width: 12px; height: 12px; background: ${color}; border: 1px solid #fff; border-radius: 50%; display:inline-block; vertical-align:middle;"></div>`;
+            else if (shape === 'square') return `<div style="width: 12px; height: 12px; background: ${color}; border: 1px solid #fff; display:inline-block; vertical-align:middle;"></div>`;
+            else if (shape === 'star') return `<span style="font-size: 14px; color: ${color}; display:inline-block; vertical-align:middle;">★</span>`;
+            else return `<div style="width: 12px; height: 18px; background: ${color}; border: 1px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display:inline-block; vertical-align:middle;"></div>`;
         }
 
         map.on('click', function(e) {
             if (isAddingMarker) {
-                let labelText = document.getElementById('input-marker-label').value.trim() || `Titik Lokasi ${customMarkers.length + 1}`;
+                let labelText = document.getElementById('input-marker-label').value.trim() || `Titik ${customMarkers.length + 1}`;
                 let shape = document.getElementById('select-marker-shape').value;
                 let color = document.getElementById('input-marker-color').value;
                 let currentId = markerIdCounter++;
-
                 let customIcon = L.divIcon({ className: 'custom-map-icon', html: `<div style="text-align:center;">${getMarkerHtml(shape, color, labelText)}</div>`, iconSize: [24, 24], iconAnchor: [12, 20] });
                 let marker = L.marker(e.latlng, { icon: customIcon }).addTo(map);
-                
-                marker.bindPopup(`<b>${labelText}</b><br><button onclick="removeCustomMarker(${currentId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">Hapus Titik</button>`);
-                customMarkers.push({ id: currentId, label: labelText, shape: shape, color: color, marker: marker });
-                
-                updateLegend(); 
-                isAddingMarker = false;
-                updateToolButtons();
-            } 
-            else if (isAddingAnnotation) {
+                marker.bindPopup(`<b>${labelText}</b><br><button onclick="removeCustomMarker(${currentId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">Hapus</button>`);
+                customMarkers.push({ id: currentId, marker: marker });
+                isAddingMarker = false; updateToolButtons();
+            } else if (isAddingAnnotation) {
                 let text = document.getElementById('input-annot-text').value.trim();
                 let annotId = annotIdCounter++;
-                
-                let anchor = L.circleMarker(e.latlng, { radius: 4, color: '#2c3e50', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
-                
+                let anchor = L.circleMarker(e.latlng, { radius: 4, color: '#2c3e50', fillColor: '#e74c3c', fillOpacity: 1 }).addTo(map);
                 let pt = map.latLngToLayerPoint(e.latlng);
-                let offsetPt = L.point(pt.x + 60, pt.y - 80);
-                let offsetLatLng = map.layerPointToLatLng(offsetPt);
-                
-                let iconHtml = `<div style="background:#fff; border:2px solid #2c3e50; padding:5px; box-shadow:3px 3px 6px rgba(0,0,0,0.4); width:130px; border-radius:4px; box-sizing:border-box; text-align:center;">
-                    <img src="${currentUploadedImageBase64}" style="width:100%; max-height:85px; object-fit:cover; display:block; margin-bottom:5px; border:1px solid #ccc;">
-                    ${text ? `<div style="font-size:10px; font-family:Arial; color:#333; font-weight:bold; line-height:1.2; word-wrap:break-word;">${text}</div>` : ''}
-                </div>`;
-                
-                let icon = L.divIcon({ className: 'custom-annot-icon', html: iconHtml, iconSize: [140, null], iconAnchor: [70, 50] }); 
-                let imgBox = L.marker(offsetLatLng, { icon: icon, draggable: true }).addTo(map);
-                
+                let offsetLatLng = map.layerPointToLatLng(L.point(pt.x + 60, pt.y - 80));
+                let iconHtml = `<div style="background:#fff; border:2px solid #2c3e50; padding:5px; width:130px; border-radius:4px; text-align:center;"><img src="${currentUploadedImageBase64}" style="width:100%; max-height:85px; object-fit:cover; display:block; margin-bottom:5px;">${text ? `<div style="font-size:10px; font-weight:bold;">${text}</div>` : ''}</div>`;
+                let imgBox = L.marker(offsetLatLng, { icon: L.divIcon({ className: 'custom-annot-icon', html: iconHtml, iconSize: [140, null], iconAnchor: [70, 50] }), draggable: true }).addTo(map);
                 let line = L.polyline([e.latlng, offsetLatLng], { color: '#2c3e50', weight: 2, dashArray: '4,4' }).addTo(map);
-                
-                imgBox.on('drag', function() {
-                    line.setLatLngs([anchor.getLatLng(), imgBox.getLatLng()]);
-                });
-                
-                imgBox.bindPopup(`<b>Opsi Anotasi</b><br><button onclick="removeAnnotation(${annotId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; width:100%;">🗑️ Hapus Gambar Ini</button>`);
-                
+                imgBox.on('drag', () => line.setLatLngs([anchor.getLatLng(), imgBox.getLatLng()]));
                 customAnnotations.push({ id: annotId, anchor: anchor, imgBox: imgBox, line: line });
-                
-                isAddingAnnotation = false;
-                updateToolButtons();
+                isAddingAnnotation = false; updateToolButtons();
             }
         });
 
         window.removeCustomMarker = function(id) {
-            let index = customMarkers.findIndex(cm => cm.id === id);
-            if (index !== -1) { map.removeLayer(customMarkers[index].marker); customMarkers.splice(index, 1); updateLegend(); }
+            let idx = customMarkers.findIndex(cm => cm.id === id);
+            if (idx !== -1) { map.removeLayer(customMarkers[idx].marker); customMarkers.splice(idx, 1); }
         };
-        
-        window.removeAnnotation = function(id) {
-            let index = customAnnotations.findIndex(ca => ca.id === id);
-            if (index !== -1) { 
-                let ca = customAnnotations[index];
-                map.removeLayer(ca.anchor);
-                map.removeLayer(ca.imgBox);
-                map.removeLayer(ca.line);
-                customAnnotations.splice(index, 1); 
-            }
-        };
-
-        // --- DATA PETA ---
-        let desaData = null;
-        let activeLayer = null, maskLayer = null, layerDesa = null;
-        let labelLayer = L.layerGroup().addTo(map);
-
-        const selectProvinsi = document.getElementById('select-provinsi');
-        const selectKabupaten = document.getElementById('select-kabupaten');
-        const selectDesa = document.getElementById('select-desa');
-        const msgLoading = document.getElementById('desa-loading-msg');
-
-        const selectShowKab = document.getElementById('select-show-kab');
-        const selectShowLabel = document.getElementById('select-show-label');
-        const selectMasking = document.getElementById('select-masking');
-        const selectSymbology = document.getElementById('select-symbology');
-        const selectOpacity = document.getElementById('select-opacity');
-        const selectWeight = document.getElementById('select-weight');
-        const selectDash = document.getElementById('select-dash');
-        const selectLabelColor = document.getElementById('select-label-color');
-        const selectLabelSize = document.getElementById('select-label-size');
-        const inputFillColor = document.getElementById('input-fill-color');
-        
-        const infoWilayah = document.getElementById('info-wilayah');
-        const dynamicLegend = document.getElementById('dynamic-legend');
-
-        // 1. LOAD PROVINSI DARI API, DENGAN FALLBACK KE JSON LOKAL JIKA GAGAL
-        function loadProvinsi() {
-            fetch('/api/get-wilayah')
-                .then(res => {
-                    if (!res.ok) throw new Error("API error");
-                    return res.json();
-                })
-                .then(provinces => {
-                    if (!provinces || provinces.length === 0) throw new Error("Kosong");
-                    isiDropdownProvinsi(provinces);
-                })
-                .catch(err => {
-                    console.warn("API get-wilayah gagal, menggunakan cadangan file JSON lokal...", err);
-                    fetch('data/38 Provinsi Indonesia - Kabupaten.json')
-                        .then(res => res.json())
-                        .then(data => {
-                            kabupatenDataLocal = data;
-                            let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
-                            isiDropdownProvinsi(provinces);
-                        })
-                        .catch(e => {
-                            console.error("Gagal total memuat provinsi:", e);
-                            selectProvinsi.innerHTML = '<option value="">-- Gagal Memuat --</option>';
-                            selectProvinsi.classList.remove('loading');
-                        });
-                });
-        }
-
-        function isiDropdownProvinsi(provinces) {
-            selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-            provinces.forEach(prov => {
-                let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
-            });
-            selectProvinsi.classList.remove('loading');
-        }
-        loadProvinsi();
-
-        // 2. EVENT LISTENER PROVINSI
-        selectProvinsi.addEventListener('change', function() {
-            let prov = this.value;
-            selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
-            selectKabupaten.disabled = true;
-            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
-            selectDesa.disabled = true;
-            
-            if (!prov) {
-                selectKabupaten.innerHTML = '<option value="">-- Pilih Provinsi Terlebih Dahulu --</option>';
-                updateMapDisplay();
-                return;
-            }
-
-            fetch(`/api/get-wilayah?provinsi=${encodeURIComponent(prov)}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("API error");
-                    return res.json();
-                })
-                .then(kabupatens => {
-                    if (!kabupatens || kabupatens.length === 0) throw new Error("Kosong");
-                    isiDropdownKabupaten(kabupatens);
-                })
-                .catch(err => {
-                    console.warn("API kabupaten gagal, menggunakan cadangan lokal...", err);
-                    if (kabupatenDataLocal) {
-                        let kabSet = new Set();
-                        kabupatenDataLocal.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
-                        isiDropdownKabupaten(Array.from(kabSet).sort());
-                    } else {
-                        selectKabupaten.innerHTML = '<option value="">-- Gagal Memuat --</option>';
-                    }
-                });
-        });
-
-        function isiDropdownKabupaten(kabupatens) {
-            selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>';
-            currentDistrictList = kabupatens;
-            kabupatens.forEach(kab => {
-                let opt = document.createElement('option'); opt.value = kab; opt.textContent = kab; selectKabupaten.appendChild(opt);
-            });
-            selectKabupaten.disabled = false;
-            updateMapDisplay();
-        }
-
-        // 3. EVENT LISTENER KABUPATEN
-        selectKabupaten.addEventListener('change', function() {
-            let kab = this.value;
-            
-            selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
-            selectDesa.classList.add('loading');
-            selectDesa.disabled = true;
-            msgLoading.style.display = 'block';
-            msgLoading.style.color = '#e74c3c';
-            msgLoading.innerText = 'Sedang mengambil data dari database...';
-            desaDataLoaded = false;
-            desaData = null;
-            
-            updateMapDisplay();
-
-            if (!kab) {
-                selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
-                selectDesa.classList.remove('loading');
-                msgLoading.style.display = 'none';
-                return;
-            }
-
-            fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("Gagal mengambil API");
-                    return res.json();
-                })
-                .then(data => {
-                    desaData = data;
-                    desaDataLoaded = true;
-                    selectDesa.classList.remove('loading');
-                    msgLoading.style.display = 'none';
-                    populateDesaDropdown();
-                })
-                .catch(err => {
-                    msgLoading.innerText = 'Gagal memuat desa dari database (Cek koneksi API).';
-                    selectDesa.innerHTML = '<option value="">-- Error Database --</option>';
-                    selectDesa.classList.remove('loading');
-                });
-        });
-
-        function populateDesaDropdown() {
-            selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
-            if (!desaData || !desaData.features) return;
-            
-            let desaSet = new Set();
-            desaData.features.forEach(f => {
-                if (f.properties) {
-                    let namaDesa = f.properties.WADMKD || f.properties.wadmkd;
-                    if (namaDesa) desaSet.add(namaDesa);
-                }
-            });
-
-            Array.from(desaSet).sort().forEach(desa => {
-                let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
-            });
-            selectDesa.disabled = false;
-        }
-
-        selectDesa.addEventListener('change', updateMapDisplay);
-
-        ['select-show-kab', 'select-show-label', 'select-masking', 'input-fill-color', 'select-symbology', 'select-opacity', 'select-weight', 'select-dash', 'select-label-color', 'select-label-size'].forEach(id => document.getElementById(id).addEventListener('change', updateMapDisplay));
-
-        // --- UPDATE TAMPILAN PETA ---
-        function updateMapDisplay() {
-            let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
-            let showKabLines = selectShowKab.value === 'ya', showLabels = selectShowLabel.value === 'ya', maskMode = selectMasking.value;
-            let symbology = selectSymbology.value, fillColor = inputFillColor.value;
-            let opacityVal = parseFloat(selectOpacity.value);
-            let weightVal = parseFloat(selectWeight.value);
-            let dashVal = selectDash.value;
-            
-            let labelColor = selectLabelColor.value;
-            let labelSize = selectLabelSize.value;
-            let fontColor = labelColor === 'putih' ? '#ffffff' : '#111111';
-            let outlineColor = labelColor === 'putih' ? '#111111' : '#ffffff';
-            let fontSize = labelSize === 'kecil' ? '7px' : (labelSize === 'besar' ? '12px' : '9px');
-            let textShadowStyle = `1px 1px 0 ${outlineColor}, -1px -1px 0 ${outlineColor}, 1px -1px 0 ${outlineColor}, -1px 1px 0 ${outlineColor}, 0px 0px 4px ${outlineColor}`;
-
-            if (activeLayer) map.removeLayer(activeLayer);
-            if (maskLayer) map.removeLayer(maskLayer);
-            if (layerDesa) map.removeLayer(layerDesa);
-            labelLayer.clearLayers();
-
-            if (!selectedProv) {
-                infoWilayah.innerHTML = `<b>Wilayah:</b> Seluruh Indonesia<br><b>Proyeksi:</b> WGS 84`;
-                currentGeoJsonFeatures = [];
-                updateLegend(); updateMiniMapHighlight(null);
-                miniMap.setView([-0.7893, 113.9213], 4); return;
-            }
-
-            // Tampilkan Desa yang dipilih menggunakan WADMKD
-            if (selectedDesa && desaDataLoaded && desaData) {
-                infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Desa/Kel:</b> ${selectedDesa}<br><b>Proyeksi:</b> WGS 84`;
-                updateLegend();
-
-                layerDesa = L.geoJSON(desaData, {
-                    filter: function(f) { 
-                        if (!f.properties) return false;
-                        let p = f.properties;
-                        let namaDesa = p.WADMKD || p.wadmkd;
-                        return namaDesa === selectedDesa; 
-                    },
-                    style: { color: "#2c3e50", weight: 2, fillColor: fillColor, fillOpacity: opacityVal },
-                    onEachFeature: function(feature, layer) {
-                        if (showLabels) {
-                            try {
-                                let pt = turf.pointOnFeature(feature);
-                                let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-                                let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${selectedDesa}</div>`;
-                                let lbl = L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true });
-                                labelLayer.addLayer(lbl);
-                            } catch(e){}
-                        }
-                    }
-                }).addTo(map);
-
-                if (layerDesa.getLayers().length > 0) map.fitBounds(layerDesa.getBounds());
-                updateMiniMapHighlight(layerDesa.toGeoJSON());
-                return;
-            }
-
-            // Jika Kabupaten dipilih, ambil geojson dari desaData
-            if (selectedKab && desaDataLoaded && desaData) {
-                infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Proyeksi:</b> WGS 84`;
-                currentGeoJsonFeatures = desaData.features;
-                updateLegend();
-
-                activeLayer = L.geoJSON(desaData, {
-                    style: function(feature) {
-                        return { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal };
-                    },
-                    onEachFeature: function(feature, layer) {
-                        let labelText = feature.properties.WADMKD || feature.properties.wadmkd;
-                        if (showLabels && labelText) {
-                            try {
-                                let pt = turf.pointOnFeature(feature);
-                                let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-                                let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${labelText}</div>`;
-                                let lbl = L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true });
-                                labelLayer.addLayer(lbl);
-                            } catch(e){}
-                        }
-                    }
-                }).addTo(map);
-
-                updateMiniMapHighlight({ type: "FeatureCollection", features: currentGeoJsonFeatures });
-                if (activeLayer.getLayers().length > 0) map.fitBounds(activeLayer.getBounds());
-                return;
-            }
-
-            infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> -<br><b>Proyeksi:</b> WGS 84`;
-            updateLegend();
-        }
-
-        function updateLegend() {
-            let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
-            let fillColor = inputFillColor.value;
-            let html = '';
-            
-            if (!selectedProv) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.6; border:1px solid #000;"></span> Seluruh Indonesia<br>`;
-            } else if (selectedDesa) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:#e67e22; opacity:0.7; border:1px solid #d35400;"></span> Kel. ${selectedDesa}<br>`;
-            } else if (selectedKab) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #000;"></span> ${selectedKab}<br>`;
-            } else {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
-            }
-
-            customMarkers.forEach(cm => {
-                html += `<div style="margin-top:3px; display:flex; align-items:center; gap:5px;"><span>${getMarkerHtml(cm.shape, cm.color, cm.label)}</span> <span>${cm.label}</span></div>`;
-            });
-            dynamicLegend.innerHTML = html;
-        }
 
         // --- EKSPOR PNG & PDF ---
         function exportToPNG() {
             const btn = document.getElementById('btn-export-png');
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ Memproses Ekspor...";
-            
+            let orig = btn.innerText; btn.innerText = "⏳ Memproses Ekspor...";
             setTimeout(() => {
-                html2canvas(document.getElementById('layoutSheet'), { 
-                    useCORS: true, 
-                    allowTaint: false, 
-                    scale: 2,
-                    backgroundColor: '#ffffff'
-                }).then(canvas => {
-                    let link = document.createElement('a'); 
-                    link.download = 'Peta-Administrasi.png'; 
-                    link.href = canvas.toDataURL('image/png'); 
-                    link.click();
-                    btn.innerText = originalText;
-                }).catch(err => {
-                    alert("Gagal mengekspor: " + err.message);
-                    btn.innerText = originalText;
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                    let link = document.createElement('a'); link.download = 'Peta-Desa.png'; link.href = canvas.toDataURL('image/png'); link.click();
+                    btn.innerText = orig;
                 });
-            }, 600);
+            }, 500);
         }
 
         function exportToPDF() {
             const btn = document.getElementById('btn-export-pdf');
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ Memproses PDF...";
-            
+            let orig = btn.innerText; btn.innerText = "⏳ Memproses PDF...";
             setTimeout(() => {
-                html2canvas(document.getElementById('layoutSheet'), { 
-                    useCORS: true, 
-                    allowTaint: false, 
-                    scale: 2,
-                    backgroundColor: '#ffffff'
-                }).then(canvas => {
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
                     const imgData = canvas.toDataURL('image/png'); 
                     const { jsPDF } = window.jspdf;
                     const pdf = new jsPDF('l', 'mm', 'a4');
                     pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
-                    pdf.save('Peta-Administrasi.pdf');
-                    btn.innerText = originalText;
-                }).catch(err => {
-                    alert("Gagal mengekspor: " + err.message);
-                    btn.innerText = originalText;
+                    pdf.save('Peta-Desa.pdf');
+                    btn.innerText = orig;
                 });
-            }, 600);
+            }, 500);
         }
     </script>
 </body>
