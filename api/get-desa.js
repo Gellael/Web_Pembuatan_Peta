@@ -13,37 +13,32 @@ const pool = new Pool({
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    const { kabupaten } = req.query; 
-
-    if (!kabupaten) {
-        return res.status(400).json({ error: "Pilih kabupaten terlebih dahulu." });
-    }
+    const { provinsi } = req.query;
 
     try {
-        // Menggunakan WADMKK untuk filter kabupaten dan mengambil semua data wilayahnya
-        const query = `
-            SELECT jsonb_build_object(
-                'type',     'FeatureCollection',
-                'features', COALESCE(jsonb_agg(features.feature), '[]'::jsonb)
-            ) as geojson
-            FROM (
-              SELECT jsonb_build_object(
-                'type',       'Feature',
-                'geometry',   ST_AsGeoJSON(geom)::jsonb,
-                'properties', to_jsonb(inputs) - 'geom'
-              ) AS feature
-              FROM (
-                SELECT * FROM batas_wilayah 
-                WHERE WADMKK ILIKE $1
-              ) inputs
-            ) features;
-        `;
-        
-        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
-        res.status(200).json(rows[0].geojson);
-        
+        if (!provinsi) {
+            // Ambil daftar provinsi unik dari database
+            const queryProv = `
+                SELECT DISTINCT "WADMPR" AS provinsi 
+                FROM batas_wilayah 
+                WHERE "WADMPR" IS NOT NULL 
+                ORDER BY provinsi ASC;
+            `;
+            const { rows } = await pool.query(queryProv);
+            return res.status(200).json(rows.map(r => r.provinsi));
+        } else {
+            // Ambil daftar kabupaten/kota unik berdasarkan provinsi yang dipilih
+            const queryKab = `
+                SELECT DISTINCT "WADMKK" AS kabupaten 
+                FROM batas_wilayah 
+                WHERE "WADMPR" ILIKE $1 AND "WADMKK" IS NOT NULL 
+                ORDER BY kabupaten ASC;
+            `;
+            const { rows } = await pool.query(queryKab, [provinsi]);
+            return res.status(200).json(rows.map(r => r.kabupaten));
+        }
     } catch (error) {
         console.error("Database Error:", error);
-        res.status(500).json({ error: "Gagal mengambil data dari database" });
+        res.status(500).json({ error: "Gagal mengambil data wilayah dari database" });
     }
 };

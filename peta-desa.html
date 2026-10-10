@@ -86,11 +86,11 @@
             <h3 class="card-step-title">1. Lokasi Pemetaan</h3>
             <div class="form-group">
                 <label>Provinsi</label>
-                <select id="select-provinsi"><option value="">-- Pilih Provinsi --</option></select>
+                <select id="select-provinsi" class="loading"><option value="">-- Memuat Provinsi dari DB... --</option></select>
             </div>
             <div class="form-group">
                 <label>Kabupaten/Kota</label>
-                <select id="select-kabupaten" disabled><option value="">-- Semua Kabupaten/Kota --</option></select>
+                <select id="select-kabupaten" disabled><option value="">-- Pilih Provinsi Terlebih Dahulu --</option></select>
             </div>
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
                 <label style="color: #d35400;">📍 Kelurahan / Desa</label>
@@ -612,7 +612,7 @@
         };
 
         // --- DATA PETA ---
-        let kabupatenData = null, desaData = null;
+        let desaData = null;
         let activeLayer = null, maskLayer = null, layerDesa = null;
         let labelLayer = L.layerGroup().addTo(map);
 
@@ -635,36 +635,56 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        // Load Data Provinsi / Kabupaten (Lokal)
-        fetch('data/38 Provinsi Indonesia - Kabupaten.json')
-            .then(res => res.json())
-            .then(data => {
-                kabupatenData = data;
-                let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
-                selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-                provinces.forEach(prov => {
-                    let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
+        // 1. LOAD PROVINSI LANGSUNG DARI DATABASE
+        function loadProvinsi() {
+            fetch('/api/get-wilayah')
+                .then(res => res.json())
+                .then(provinces => {
+                    selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
+                    provinces.forEach(prov => {
+                        let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
+                    });
+                    selectProvinsi.classList.remove('loading');
+                })
+                .catch(err => {
+                    console.error("Gagal memuat Provinsi:", err);
+                    selectProvinsi.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                    selectProvinsi.classList.remove('loading');
                 });
-            })
-            .catch(err => { console.error("Gagal memuat JSON Kabupaten:", err); });
+        }
+        loadProvinsi();
 
-
-        // --- EVENT LISTENER KABUPATEN ---
+        // 2. EVENT LISTENER PROVINSI (LOAD KABUPATEN DARI DB)
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
-            selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>'; selectKabupaten.disabled = true;
-            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>'; selectDesa.disabled = true;
+            selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
+            selectKabupaten.disabled = true;
+            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
+            selectDesa.disabled = true;
             
-            if (!prov || !kabupatenData) { updateMapDisplay(); return; }
+            if (!prov) {
+                selectKabupaten.innerHTML = '<option value="">-- Pilih Provinsi Terlebih Dahulu --</option>';
+                updateMapDisplay();
+                return;
+            }
 
-            let kabSet = new Set();
-            kabupatenData.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
-            currentDistrictList = Array.from(kabSet).sort();
-            currentDistrictList.forEach(kab => { let opt = document.createElement('option'); opt.value = kab; opt.textContent = kab; selectKabupaten.appendChild(opt); });
-            selectKabupaten.disabled = false;
-            updateMapDisplay();
+            fetch(`/api/get-wilayah?provinsi=${encodeURIComponent(prov)}`)
+                .then(res => res.json())
+                .then(kabupatens => {
+                    selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>';
+                    kabupatens.forEach(kab => {
+                        let opt = document.createElement('option'); opt.value = kab; opt.textContent = kab; selectKabupaten.appendChild(opt);
+                    });
+                    selectKabupaten.disabled = false;
+                    updateMapDisplay();
+                })
+                .catch(err => {
+                    console.error("Gagal memuat Kabupaten:", err);
+                    selectKabupaten.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                });
         });
 
+        // 3. EVENT LISTENER KABUPATEN (LOAD DESA DARI DB)
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             
@@ -705,7 +725,6 @@
                 });
         });
 
-        // POPULATE DROPDOWN MENGGUNAKAN KOLOM WADMKD (KELURAHAN/DESA)
         function populateDesaDropdown() {
             selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
             if (!desaData || !desaData.features) return;
@@ -787,69 +806,43 @@
                 return;
             }
 
-            // Tampilkan Kabupaten
-            let filterFunc = selectedKab ? (f => f.properties.WADMKK === selectedKab) : (f => f.properties.WADMPR === selectedProv);
-            currentGeoJsonFeatures = kabupatenData.features.filter(filterFunc);
-            
-            infoWilayah.innerHTML = selectedKab ? `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Proyeksi:</b> WGS 84` : `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> -<br><b>Proyeksi:</b> WGS 84`;
-            updateLegend();
+            // Jika Kabupaten dipilih, ambil geojson dari desaData yang sudah ditarik sebelumnya
+            if (selectedKab && desaDataLoaded && desaData) {
+                infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Proyeksi:</b> WGS 84`;
+                currentGeoJsonFeatures = desaData.features;
+                updateLegend();
 
-            activeLayer = L.geoJSON(kabupatenData, {
-                filter: filterFunc,
-                style: function(feature) {
-                    let featColor = fillColor;
-                    if (symbology === 'categorized' && feature.properties.WADMKK && !selectedKab) {
-                        let idx = currentDistrictList.indexOf(feature.properties.WADMKK);
-                        if(idx !== -1) featColor = colorPalette[idx % colorPalette.length];
-                    }
-                    return { color: "#2c3e50", weight: (showKabLines || selectedKab) ? weightVal : weightVal + 0.5, dashArray: dashVal, fillColor: featColor, fillOpacity: opacityVal };
-                },
-                onEachFeature: function(feature, layer) {
-                    let labelText = selectedKab ? feature.properties.WADMKK : feature.properties.WADMKK;
-                    if (showLabels && labelText) {
-                        try {
-                            let pt = turf.pointOnFeature(feature);
-                            let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-                            let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${labelText}</div>`;
-                            let lbl = L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true });
-                            labelLayer.addLayer(lbl);
-                        } catch(e){}
-                    }
-                }
-            }).addTo(map);
-
-            if (maskMode !== 'none') {
-                try {
-                    let fc = turf.featureCollection(currentGeoJsonFeatures);
-                    let combined = turf.combine(fc); 
-                    let maskedPolygon = turf.mask(combined); 
-
-                    let mColor = maskMode === 'dim' ? '#000000' : '#ffffff';
-                    let mOpacity = maskMode === 'dim' ? 0.65 : 1.0;
-                    maskLayer = L.geoJSON(maskedPolygon, { stroke: false, fillColor: mColor, fillOpacity: mOpacity, interactive: false }).addTo(map);
-                } catch(e) {
-                    let maskCoords = [ [ [90, -360], [90, 360], [-90, 360], [-90, -360] ] ];
-                    currentGeoJsonFeatures.forEach(feat => {
-                        if (feat.geometry.type === 'Polygon') {
-                            maskCoords.push(feat.geometry.coordinates[0].map(c => [c[1], c[0]]));
-                        } else if (feat.geometry.type === 'MultiPolygon') {
-                            feat.geometry.coordinates.forEach(poly => { maskCoords.push(poly[0].map(c => [c[1], c[0]])); });
+                activeLayer = L.geoJSON(desaData, {
+                    style: function(feature) {
+                        return { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        let labelText = feature.properties.WADMKD || feature.properties.wadmkd;
+                        if (showLabels && labelText) {
+                            try {
+                                let pt = turf.pointOnFeature(feature);
+                                let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
+                                let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${labelText}</div>`;
+                                let lbl = L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true });
+                                labelLayer.addLayer(lbl);
+                            } catch(e){}
                         }
-                    });
-                    let mColor = maskMode === 'dim' ? '#000000' : '#ffffff';
-                    let mOpacity = maskMode === 'dim' ? 0.65 : 1.0;
-                    maskLayer = L.polygon(maskCoords, { stroke: false, fillColor: mColor, fillOpacity: mOpacity, interactive: false }).addTo(map);
-                }
-                activeLayer.bringToFront();
+                    }
+                }).addTo(map);
+
+                updateMiniMapHighlight({ type: "FeatureCollection", features: currentGeoJsonFeatures });
+                if (activeLayer.getLayers().length > 0) map.fitBounds(activeLayer.getBounds());
+                return;
             }
-            
-            updateMiniMapHighlight({ type: "FeatureCollection", features: currentGeoJsonFeatures });
-            if (activeLayer.getLayers().length > 0) map.fitBounds(activeLayer.getBounds());
+
+            // Jika hanya Provinsi yang dipilih, kosongkan atau muat batas provinsi (jika diperlukan)
+            infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> -<br><b>Proyeksi:</b> WGS 84`;
+            updateLegend();
         }
 
         function updateLegend() {
             let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
-            let showKabLines = selectShowKab.value === 'ya', symbology = selectSymbology.value, fillColor = inputFillColor.value;
+            let showKabLines = selectShowKab.value === 'ya', fillColor = inputFillColor.value;
             let html = '';
             
             if (!selectedProv) {
@@ -859,20 +852,7 @@
             } else if (selectedKab) {
                 html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #000;"></span> ${selectedKab}<br>`;
             } else {
-                if(symbology === 'categorized') {
-                    if (currentGeoJsonFeatures.length > 0) {
-                        html += `<b>Keterangan Wilayah:</b><br>`;
-                        currentGeoJsonFeatures.forEach(feat => {
-                            let namaKab = feat.properties.WADMKK;
-                            let idx = currentDistrictList.indexOf(namaKab);
-                            let featColor = (idx !== -1) ? colorPalette[idx % colorPalette.length] : fillColor;
-                            html += `<span style="display:inline-block; width:10px; height:10px; background:${featColor}; opacity:0.8; border:1px solid #333; margin-top:2px;"></span> ${namaKab}<br>`;
-                        });
-                    }
-                } else {
-                    html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
-                }
-                if(showKabLines) html += `<span style="display:inline-block; width:10px; height:2px; background:#222; vertical-align:middle; margin-top:4px; margin-bottom:2px;"></span> Batas Kabupaten/Kota<br>`;
+                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
             }
 
             customMarkers.forEach(cm => {
