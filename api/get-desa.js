@@ -13,7 +13,6 @@ const pool = new Pool({
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-
     const { kabupaten } = req.query; 
 
     if (!kabupaten) {
@@ -21,6 +20,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        // PENCARIAN KETAT: Hanya mencari di kolom wadmkk (Kabupaten/Kota)
         const query = `
             SELECT jsonb_build_object(
                 'type',     'FeatureCollection',
@@ -34,13 +34,12 @@ module.exports = async (req, res) => {
               ) AS feature
               FROM (
                 SELECT * FROM batas_wilayah 
-                WHERE wadmkk ILIKE $1 OR kabupaten ILIKE $1 OR remark ILIKE $1
+                WHERE wadmkk ILIKE $1 
               ) inputs
             ) features;
         `;
-
-        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
         
+        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
         res.status(200).json(rows[0].geojson);
         
     } catch (error) {
