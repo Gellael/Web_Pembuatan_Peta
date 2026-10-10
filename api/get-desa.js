@@ -6,13 +6,16 @@ const pool = new Pool({
     host: 'pg-137069dd-bananaman46gt-a4c8.j.aivencloud.com',
     port: 22783,
     database: 'defaultdb',
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false }
 });
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    const { kabupaten } = req.query; 
+
+    if (!kabupaten) {
+        return res.status(400).json({ error: "Pilih kabupaten terlebih dahulu." });
+    }
 
     try {
         const query = `
@@ -28,12 +31,12 @@ module.exports = async (req, res) => {
               ) AS feature
               FROM (
                 SELECT * FROM batas_wilayah 
-                WHERE COALESCE(wadmkd, WADMKD, '') != ''
+                WHERE WADMKK ILIKE $1 
               ) inputs
             ) features;
         `;
         
-        const { rows } = await pool.query(query);
+        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
         res.status(200).json(rows[0].geojson);
         
     } catch (error) {
