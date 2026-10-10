@@ -100,7 +100,7 @@
                     <option value="">-- Memuat Data Desa... --</option>
                 </select>
                 <!-- Menambahkan pesan kecil jika data besar -->
-                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: block; margin-top: 4px;">Sedang memuat database desa, mohon tunggu...</small>
+                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: block; margin-top: 4px;">Sedang terhubung ke database, mohon tunggu...</small>
             </div>
         </div>
 
@@ -637,7 +637,7 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        // 1. Load Data Kabupaten & Provinsi
+        // 1. Load Data Kabupaten & Provinsi (Lokal JSON)
         fetch('data/38 Provinsi Indonesia - Kabupaten.json')
             .then(res => res.json())
             .then(data => {
@@ -650,9 +650,12 @@
             })
             .catch(err => { console.error("Gagal memuat JSON Kabupaten:", err); });
 
-        // 2. Load Data Desa (Lazy Load / fetch di latar belakang tanpa memberatkan UI awal)
-        fetch('data/peta-perdesa.geojson')
-            .then(res => res.json())
+        // 2. Load Data Desa (Mengambil dari database Aiven via Vercel Serverless API)
+        fetch('/api/get-desa')
+            .then(res => {
+                if (!res.ok) throw new Error("Gagal mengambil dari API");
+                return res.json();
+            })
             .then(data => { 
                 desaData = data; 
                 desaDataLoaded = true; // Tandai data desa sudah dimuat
@@ -668,8 +671,8 @@
                 }
             })
             .catch(err => { 
-                console.error("Gagal memuat JSON Desa:", err);
-                desaLoadingMsg.innerText = "Gagal memuat database desa.";
+                console.error("Gagal memuat JSON Desa dari API:", err);
+                desaLoadingMsg.innerText = "Gagal terhubung ke database. Cek API Anda.";
                 desaLoadingMsg.style.color = "red";
             });
 
