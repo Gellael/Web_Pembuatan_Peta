@@ -1,10 +1,9 @@
 const { Pool } = require('pg');
 
-// Konfigurasi koneksi ke Aiven
-// Konfigurasi koneksi ke Aiven (Tanpa connectionString agar SSL terbaca)
+// Konfigurasi koneksi ke Aiven menggunakan Environment Variable untuk keamanan
 const pool = new Pool({
     user: 'avnadmin',
-    password: 'YOUR_PASSWORD',
+    password: process.env.AIVEN_DB_PASSWORD, // Rahasia disimpan di Vercel
     host: 'pg-137069dd-bananaman46gt-a4c8.j.aivencloud.com',
     port: 22783,
     database: 'defaultdb',
