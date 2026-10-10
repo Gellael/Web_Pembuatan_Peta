@@ -91,16 +91,6 @@
                 <label>Kabupaten/Kota</label>
                 <select id="select-kabupaten" disabled><option value="">-- Semua Kabupaten/Kota --</option></select>
             </div>
-            
-            <div class="form-group" style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #bdc3c7;">
-                <label style="color: #d35400;">📍 Batas Kelurahan / Desa</label>
-                <select id="select-desa">
-                    <option value="">-- Memuat Data Desa... --</option>
-                </select>
-                <p style="font-size: 8px; color: #7f8c8d; margin-top: 4px; line-height: 1.3;">
-                    *Menampilkan batas desa spesifik dari data <b>peta-perdesa.geojson</b>
-                </p>
-            </div>
         </div>
 
         <!-- STEP 2: IDENTITAS -->
@@ -287,7 +277,7 @@
             </div>
         </div>
 
-        <!-- STEP 7: ANOTASI GAMBAR (FITUR BARU) -->
+        <!-- STEP 7: ANOTASI GAMBAR -->
         <div class="control-card">
             <h3 class="card-step-title">7. Anotasi Gambar (Callout)</h3>
             <div class="form-group">
@@ -391,7 +381,7 @@
             }
         }
 
-        // Inisialisasi Peta Utama (preferCanvas = true, SANGAT PENTING untuk rendering Garis Anotasi & Border saat Ekspor PNG)
+        // Inisialisasi Peta Utama
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
 
         const basemaps = {
@@ -487,7 +477,6 @@
         let isAddingAnnotation = false, customAnnotations = [], annotIdCounter = 0;
         let currentUploadedImageBase64 = null;
 
-        // Membaca file gambar yang diupload ke Base64 (Syarat wajib agar gambar terbaca oleh html2canvas)
         document.getElementById('input-annot-img').addEventListener('change', function(e) {
             let file = e.target.files[0];
             if(file) {
@@ -499,7 +488,6 @@
             }
         });
 
-        // Mengatur status tombol UI
         function updateToolButtons() {
             const btnMarker = document.querySelector('.btn-marker');
             const btnAnnot = document.querySelector('.btn-annot');
@@ -523,7 +511,7 @@
 
         function toggleMarkerMode() {
             isAddingMarker = !isAddingMarker;
-            isAddingAnnotation = false; // Matikan fitur anotasi jika menyala
+            isAddingAnnotation = false;
             updateToolButtons();
         }
 
@@ -533,7 +521,7 @@
                 return;
             }
             isAddingAnnotation = !isAddingAnnotation;
-            isAddingMarker = false; // Matikan fitur pin jika menyala
+            isAddingMarker = false;
             updateToolButtons();
         }
 
@@ -552,7 +540,6 @@
             else return `<div style="width: 12px; height: 18px; background: ${color}; border: 1px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 0 3px rgba(0,0,0,0.5); display:inline-block; vertical-align:middle; margin:2px;"></div>`;
         }
 
-        // AKSI SAAT PETA DI KLIK (Pin Standar & Anotasi Gambar)
         map.on('click', function(e) {
             if (isAddingMarker) {
                 let labelText = document.getElementById('input-marker-label').value.trim() || `Titik Lokasi ${customMarkers.length + 1}`;
@@ -574,15 +561,12 @@
                 let text = document.getElementById('input-annot-text').value.trim();
                 let annotId = annotIdCounter++;
                 
-                // 1. Titik jangkar (Anchor) berwarna merah kecil di lokasi klik
                 let anchor = L.circleMarker(e.latlng, { radius: 4, color: '#2c3e50', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
                 
-                // 2. Hitung posisi Offset (agar gambar muncul agak di atas/kanan dari titik klik, tidak menutupi klik)
                 let pt = map.latLngToLayerPoint(e.latlng);
                 let offsetPt = L.point(pt.x + 60, pt.y - 80);
                 let offsetLatLng = map.layerPointToLatLng(offsetPt);
                 
-                // 3. Buat bingkai Gambar (Bisa digeser karena draggable: true)
                 let iconHtml = `<div style="background:#fff; border:2px solid #2c3e50; padding:5px; box-shadow:3px 3px 6px rgba(0,0,0,0.4); width:130px; border-radius:4px; box-sizing:border-box; text-align:center;">
                     <img src="${currentUploadedImageBase64}" style="width:100%; max-height:85px; object-fit:cover; display:block; margin-bottom:5px; border:1px solid #ccc;">
                     ${text ? `<div style="font-size:10px; font-family:Arial; color:#333; font-weight:bold; line-height:1.2; word-wrap:break-word;">${text}</div>` : ''}
@@ -591,15 +575,12 @@
                 let icon = L.divIcon({ className: 'custom-annot-icon', html: iconHtml, iconSize: [140, null], iconAnchor: [70, 50] }); 
                 let imgBox = L.marker(offsetLatLng, { icon: icon, draggable: true }).addTo(map);
                 
-                // 4. Buat Garis Penghubung putus-putus
                 let line = L.polyline([e.latlng, offsetLatLng], { color: '#2c3e50', weight: 2, dashArray: '4,4' }).addTo(map);
                 
-                // 5. Update arah garis jika gambar digeser (drag) oleh pengguna
                 imgBox.on('drag', function() {
                     line.setLatLngs([anchor.getLatLng(), imgBox.getLatLng()]);
                 });
                 
-                // 6. Tombol hapus disembunyikan di dalam Popup (supaya tidak ikut ter-export ke PNG)
                 imgBox.bindPopup(`<b>Opsi Anotasi</b><br><button onclick="removeAnnotation(${annotId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; width:100%;">🗑️ Hapus Gambar Ini</button>`);
                 
                 customAnnotations.push({ id: annotId, anchor: anchor, imgBox: imgBox, line: line });
@@ -609,7 +590,6 @@
             }
         });
 
-        // Fungsi Global untuk hapus komponen (Dipanggil dari Popup)
         window.removeCustomMarker = function(id) {
             let index = customMarkers.findIndex(cm => cm.id === id);
             if (index !== -1) { map.removeLayer(customMarkers[index].marker); customMarkers.splice(index, 1); updateLegend(); }
@@ -646,46 +626,17 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        fetch('data/38 Provinsi Indonesia - Kabupaten.json').then(res => res.json()).then(data => {
-            kabupatenData = data;
-            let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
-            provinces.forEach(prov => {
-                let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
-            });
-        });
-
-        // --- DATA PETA (KELURAHAN/DESA) ---
-        let desaData = null;
-        let layerDesa = null;
-        const selectDesa = document.getElementById('select-desa');
-
-        fetch('data/peta-perdesa.geojson')
+        fetch('data/38 Provinsi Indonesia - Kabupaten.json')
             .then(res => res.json())
             .then(data => {
-                desaData = data;
-                selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>';
-                let daftarDesa = [...new Set(data.features.map(f => f.properties.NAMOBJ).filter(p => p != null))].sort();
-                daftarDesa.forEach(desa => {
-                    let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
+                kabupatenData = data;
+                let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
+                selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
+                provinces.forEach(prov => {
+                    let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
                 });
             })
-            .catch(err => { selectDesa.innerHTML = '<option value="">Gagal memuat data desa</option>'; });
-
-        function updateLayerDesa() {
-            let selectedDesa = selectDesa.value;
-            if (layerDesa) { map.removeLayer(layerDesa); }
-
-            if (selectedDesa && desaData) {
-                layerDesa = L.geoJSON(desaData, {
-                    filter: function(feature) { return feature.properties.NAMOBJ === selectedDesa; },
-                    style: { color: "#d35400", weight: 2.5, fillColor: "#e67e22", fillOpacity: 0.4 },
-                    onEachFeature: function (feature, layer) { layer.bindPopup(`<b>Desa/Kelurahan:</b> ${feature.properties.NAMOBJ}`); }
-                }).addTo(map);
-
-                if (layerDesa.getLayers().length > 0) { map.fitBounds(layerDesa.getBounds()); }
-            }
-        }
-        selectDesa.addEventListener('change', updateLayerDesa);
+            .catch(err => { console.error("Gagal memuat JSON:", err); });
 
         // --- UPDATE TAMPILAN UTAMA & LEGENDA ---
         function updateLegend() {
@@ -711,10 +662,6 @@
                     html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
                 }
                 if(showKabLines) html += `<span style="display:inline-block; width:10px; height:2px; background:#222; vertical-align:middle; margin-top:4px; margin-bottom:2px;"></span> Batas Kabupaten/Kota<br>`;
-            }
-
-            if (selectDesa.value) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:#e67e22; opacity:0.6; border:1px solid #d35400; margin-top:4px;"></span> Kelurahan: ${selectDesa.value}<br>`;
             }
 
             customMarkers.forEach(cm => {
@@ -763,7 +710,7 @@
                         let idx = currentDistrictList.indexOf(feature.properties.WADMKK);
                         if(idx !== -1) featColor = colorPalette[idx % colorPalette.length];
                     }
-                    return { color: (showKabLines || selectedKab) ? "#2c3e50" : "#2c3e50", weight: (showKabLines || selectedKab) ? weightVal : weightVal + 0.5, dashArray: dashVal, fillColor: featColor, fillOpacity: opacityVal };
+                    return { color: "#2c3e50", weight: (showKabLines || selectedKab) ? weightVal : weightVal + 0.5, dashArray: dashVal, fillColor: featColor, fillOpacity: opacityVal };
                 },
                 onEachFeature: function(feature, layer) {
                     if (showLabels && feature.properties.WADMKK) {
@@ -803,7 +750,6 @@
                 activeLayer.bringToFront();
             }
             
-            if(layerDesa) { layerDesa.bringToFront(); }
             updateMiniMapHighlight({ type: "FeatureCollection", features: currentGeoJsonFeatures });
             if (activeLayer.getLayers().length > 0) map.fitBounds(activeLayer.getBounds());
         }
@@ -811,9 +757,6 @@
         selectProvinsi.addEventListener('change', function() {
             let selectedProv = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>'; selectKabupaten.disabled = true;
-            
-            selectDesa.value = '';
-            if (layerDesa) map.removeLayer(layerDesa);
             
             if (!selectedProv || !kabupatenData) { updateMapDisplay(); return; }
 
@@ -827,7 +770,7 @@
 
         ['select-kabupaten', 'select-show-kab', 'select-show-label', 'select-masking', 'input-fill-color', 'select-symbology', 'select-opacity', 'select-weight', 'select-dash', 'select-label-color', 'select-label-size'].forEach(id => document.getElementById(id).addEventListener('change', updateMapDisplay));
 
-        // --- SOLUSI BUG EKSPOR (HTML2CANVAS + LEAFLET TRANSFORM) ---
+        // --- EKSPOR PNG & PDF ---
         function exportToPNG() {
             const btn = document.getElementById('btn-export-png');
             const originalText = btn.innerText;
@@ -849,7 +792,7 @@
                     alert("Gagal mengekspor: " + err.message);
                     btn.innerText = originalText;
                 });
-            }, 600); // Waktu tunggu agar tile Leaflet merender sempurna
+            }, 600);
         }
 
         function exportToPDF() {

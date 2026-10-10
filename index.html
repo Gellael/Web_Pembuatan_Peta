@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoLayout Studio - Dashboard</title>
+    <title>GeoLayout Studio - Dashboard Profesional</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             margin: 0; padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #2f3640;
+            background: linear-gradient(135deg, #1e272e 0%, #2f3640 100%);
             color: #fff;
             display: flex;
             flex-direction: column;
@@ -16,82 +17,112 @@
             min-height: 100vh;
         }
         .header {
-            background-color: #1e272e;
+            background-color: rgba(30, 39, 46, 0.95);
             width: 100%;
-            padding: 30px 0;
+            padding: 40px 20px;
             text-align: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             border-bottom: 4px solid #3498db;
+            backdrop-filter: blur(10px);
         }
-        .header h1 { margin: 0; font-size: 28px; letter-spacing: 1px; color: #ecf0f1; }
-        .header p { margin: 8px 0 0 0; font-size: 14px; color: #bdc3c7; }
+        .header h1 { margin: 0; font-size: 32px; letter-spacing: 1.5px; color: #ecf0f1; font-weight: 700; }
+        .header p { margin: 10px 0 0 0; font-size: 15px; color: #bdc3c7; }
         
         .container {
-            max-width: 900px;
-            margin: 60px auto;
+            max-width: 1100px;
+            margin: 50px auto;
             display: flex;
-            gap: 30px;
+            gap: 25px;
             padding: 0 20px;
             flex-wrap: wrap;
             justify-content: center;
         }
         .module-card {
-            background: #f5f6fa;
+            background: #ffffff;
             color: #2f3640;
-            border-radius: 8px;
-            width: 340px;
-            padding: 35px 25px;
+            border-radius: 12px;
+            width: 320px;
+            padding: 30px 20px;
             text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
             border-top: 6px solid #2980b9;
-            transition: transform 0.3s, box-shadow 0.3s;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
             text-decoration: none;
-            display: block;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .module-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
         }
-        .module-icon { font-size: 55px; margin-bottom: 20px; }
-        .module-card h2 { margin: 0 0 15px 0; font-size: 22px; color: #2c3e50; }
-        .module-card p { font-size: 14px; color: #555; line-height: 1.6; }
+        .module-icon { font-size: 50px; margin-bottom: 15px; }
+        .module-card h2 { margin: 0 0 12px 0; font-size: 20px; color: #2c3e50; font-weight: 700; }
+        .module-card p { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 20px; }
+        
         .btn-masuk {
             display: inline-block;
-            margin-top: 25px;
-            padding: 12px 24px;
+            padding: 10px 20px;
             background-color: #2980b9;
             color: white;
-            border-radius: 4px;
+            border-radius: 6px;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
             transition: background 0.2s;
+            text-align: center;
         }
         .module-card:hover .btn-masuk { background-color: #1f618d; }
+
+        .footer {
+            margin-top: auto;
+            padding: 20px;
+            font-size: 12px;
+            color: #7f8c8d;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>🌍 GeoLayout Professional Suite</h1>
-        <p>Platform WebGIS Pembuatan Tata Letak Peta Spasial</p>
+        <p>Platform WebGIS Terpadu untuk Pemetaan Spasial & Analisis Cloud</p>
     </div>
 
     <div class="container">
-        <!-- Modul Peta Administrasi -->
-        <a href="peta-administrasi.html" class="module-card">
-            <div class="module-icon">🗺️</div>
-            <h2>Peta Administrasi</h2>
-            <p>Rancang layout cetak untuk peta batas administrasi, penempatan marker titik lokasi kustom, pengaturan basemap, dan label nama wilayah.</p>
-            <span class="btn-masuk">Buka Modul Administrasi ➔</span>
+        <!-- Modul 1: Peta Administrasi -->
+        <a href="peta-administrasi.html" class="module-card" style="border-top-color: #2980b9;">
+            <div>
+                <div class="module-icon">🗺️</div>
+                <h2>Peta Administrasi</h2>
+                <p>Rancang layout cetak untuk peta batas provinsi & kabupaten, penempatan marker kustom, pengaturan basemap, dan label nama wilayah.</p>
+            </div>
+            <span class="btn-masuk" style="background-color: #2980b9;">Buka Modul Administrasi ➔</span>
         </a>
 
-        <!-- Modul Peta Radius (Pengganti Kepadatan) -->
-        <a href="peta-radius.html" class="module-card" style="border-top-color: #8e44ad;">
-            <div class="module-icon">🎯</div>
-            <h2>Peta Radius Jangkauan</h2>
-            <p>Lakukan analisis spasial dengan membuat area radius (Buffer) di sekitar titik fasilitas atau pusat bencana berdasarkan jarak kilometer tertentu.</p>
-            <span class="btn-masuk" style="background-color: #8e44ad;">Buka Modul Analisis Radius ➔</span>
+        <!-- Modul 2: Peta Batas Desa (Cloud Aiven) -->
+        <a href="peta-desa.html" class="module-card" style="border-top-color: #e67e22;">
+            <div>
+                <div class="module-icon">🏡</div>
+                <h2>Peta Batas Desa (Cloud)</h2>
+                <p>Akses data 83.000+ kelurahan/desa langsung dari database cloud Aiven PostGIS dengan performa tinggi dan fitur ekspor cetak.</p>
+            </div>
+            <span class="btn-masuk" style="background-color: #e67e22;">Buka Modul Batas Desa ➔</span>
         </a>
+
+        <!-- Modul 3: Peta Radius Jangkauan -->
+        <a href="peta-radius.html" class="module-card" style="border-top-color: #8e44ad;">
+            <div>
+                <div class="module-icon">🎯</div>
+                <h2>Peta Radius Jangkauan</h2>
+                <p>Lakukan analisis spasial dengan membuat area radius (Buffer) di sekitar fasilitas atau pusat bencana berdasarkan jarak kilometer tertentu.</p>
+            </div>
+            <span class="btn-masuk" style="background-color: #8e44ad;">Buka Analisis Radius ➔</span>
+        </a>
+    </div>
+
+    <div class="footer">
+        &copy; 2026 GeoLayout Pro Studio. Powered by Leaflet, PostGIS, & Vercel.
     </div>
 
 </body>

@@ -1,0 +1,23 @@
+{
+  "name": "web_buat_peta",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gellael/Web_Pembuatan_Peta.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Gellael/Web_Pembuatan_Peta/issues"
+  },
+  "homepage": "https://github.com/Gellael/Web_Pembuatan_Peta#readme",
+  "description": "",
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
+}
