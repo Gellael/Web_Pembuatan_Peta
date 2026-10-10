@@ -1,9 +1,8 @@
 const { Pool } = require('pg');
 
-// Konfigurasi koneksi ke Aiven menggunakan Environment Variable untuk keamanan
 const pool = new Pool({
     user: 'avnadmin',
-    password: process.env.AIVEN_DB_PASSWORD, // Rahasia disimpan di Vercel
+    password: process.env.AIVEN_DB_PASSWORD,
     host: 'pg-137069dd-bananaman46gt-a4c8.j.aivencloud.com',
     port: 22783,
     database: 'defaultdb',
@@ -13,18 +12,19 @@ const pool = new Pool({
 });
 
 module.exports = async (req, res) => {
-    // Mengizinkan akses dari web (CORS)
     res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    // Nanti kita bisa menangkap nama kecamatan/kabupaten dari frontend di sini
-    // const { kabupaten } = req.query; 
+
+    const { kabupaten } = req.query; 
+
+    if (!kabupaten) {
+        return res.status(400).json({ error: "Pilih kabupaten terlebih dahulu." });
+    }
 
     try {
-        // Query sakti PostGIS: Mengubah data tabel spasial langsung menjadi format GeoJSON
         const query = `
             SELECT jsonb_build_object(
                 'type',     'FeatureCollection',
-                'features', jsonb_agg(features.feature)
+                'features', COALESCE(jsonb_agg(features.feature), '[]'::jsonb)
             ) as geojson
             FROM (
               SELECT jsonb_build_object(
@@ -33,14 +33,14 @@ module.exports = async (req, res) => {
                 'properties', to_jsonb(inputs) - 'geom'
               ) AS feature
               FROM (
-                SELECT * FROM batas_wilayah LIMIT 500
+                SELECT * FROM batas_wilayah 
+                WHERE wadmkk ILIKE $1 OR kabupaten ILIKE $1 OR remark ILIKE $1
               ) inputs
             ) features;
         `;
+
+        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
         
-        const { rows } = await pool.query(query);
-        
-        // Mengirimkan hasil GeoJSON ke web
         res.status(200).json(rows[0].geojson);
         
     } catch (error) {

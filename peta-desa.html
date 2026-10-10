@@ -95,12 +95,10 @@
             </div>
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
                 <label style="color: #d35400;">📍 Kelurahan / Desa</label>
-                <!-- Tambahkan indikator loading awal pada select -->
                 <select id="select-desa" disabled class="loading">
-                    <option value="">-- Memuat Data Desa... --</option>
+                    <option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>
                 </select>
-                <!-- Menambahkan pesan kecil jika data besar -->
-                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: block; margin-top: 4px;">Sedang terhubung ke database, mohon tunggu...</small>
+                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: none; margin-top: 4px;">Sedang memuat data dari database...</small>
             </div>
         </div>
 
@@ -368,7 +366,7 @@
         const colorPalette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
         let currentDistrictList = []; 
         let currentGeoJsonFeatures = [];
-        let desaDataLoaded = false; // Flag untuk status loading desa
+        let desaDataLoaded = false; // Flag status loading desa
 
         // Kontrol Skala
         const selectSkalaMode = document.getElementById('select-skala-mode');
@@ -614,7 +612,7 @@
             }
         };
 
-        // --- DATA PETA ---
+        // --- DATA PETA LOKAL (PROVINSI & KABUPATEN) ---
         let kabupatenData = null, desaData = null;
         let activeLayer = null, maskLayer = null, layerDesa = null;
         let labelLayer = L.layerGroup().addTo(map);
@@ -622,6 +620,8 @@
         const selectProvinsi = document.getElementById('select-provinsi');
         const selectKabupaten = document.getElementById('select-kabupaten');
         const selectDesa = document.getElementById('select-desa');
+        const msgLoading = document.getElementById('desa-loading-msg');
+
         const selectShowKab = document.getElementById('select-show-kab');
         const selectShowLabel = document.getElementById('select-show-label');
         const selectMasking = document.getElementById('select-masking');
@@ -632,12 +632,11 @@
         const selectLabelColor = document.getElementById('select-label-color');
         const selectLabelSize = document.getElementById('select-label-size');
         const inputFillColor = document.getElementById('input-fill-color');
-        const desaLoadingMsg = document.getElementById('desa-loading-msg');
         
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        // 1. Load Data Kabupaten & Provinsi (Lokal JSON)
+        // Load JSON Kabupaten
         fetch('data/38 Provinsi Indonesia - Kabupaten.json')
             .then(res => res.json())
             .then(data => {
@@ -650,97 +649,8 @@
             })
             .catch(err => { console.error("Gagal memuat JSON Kabupaten:", err); });
 
-        // 2. Load Data Desa (Mengambil dari database Aiven via Vercel Serverless API)
-        fetch('/api/get-desa')
-            .then(res => {
-                if (!res.ok) throw new Error("Gagal mengambil dari API");
-                return res.json();
-            })
-            .then(data => { 
-                desaData = data; 
-                desaDataLoaded = true; // Tandai data desa sudah dimuat
-                desaLoadingMsg.style.display = 'none'; // Sembunyikan pesan loading
 
-                // Jika Kabupaten sudah dipilih sebelumnya, aktifkan select desa dan populate option
-                let selectedKab = selectKabupaten.value;
-                if(selectedKab) {
-                    populateDesaDropdown(selectedKab);
-                } else {
-                    selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
-                    selectDesa.classList.remove('loading');
-                }
-            })
-            .catch(err => { 
-                console.error("Gagal memuat JSON Desa dari API:", err);
-                desaLoadingMsg.innerText = "Gagal terhubung ke database. Cek API Anda.";
-                desaLoadingMsg.style.color = "red";
-            });
-
-        // Fungsi pembantu untuk mengisi dropdown desa
-        function populateDesaDropdown(selectedKab) {
-            selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
-            selectDesa.disabled = true;
-            selectDesa.classList.remove('loading');
-            
-            if (!selectedKab || !desaDataLoaded || !desaData) return;
-
-            // Filter desa hanya berdasarkan kabupaten yang sedang dipilih
-            let desaSet = new Set();
-            desaData.features.forEach(f => {
-                let namaKabF = f.properties.WADMKK || f.properties.REMARK || f.properties.KABUPATEN;
-                if (namaKabF && namaKabF.toLowerCase().includes(selectedKab.toLowerCase()) && f.properties.NAMOBJ) {
-                    desaSet.add(f.properties.NAMOBJ);
-                }
-            });
-
-            // Jika filter spesifik kosong, tampilkan seluruh desa dari file desaData sebagai opsi cadangan
-            if (desaSet.size === 0) {
-                desaData.features.forEach(f => { if(f.properties.NAMOBJ) desaSet.add(f.properties.NAMOBJ); });
-            }
-
-            let daftarDesa = Array.from(desaSet).sort();
-            daftarDesa.forEach(desa => {
-                let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
-            });
-            selectDesa.disabled = false;
-        }
-
-        // --- UPDATE LEGENDA ---
-        function updateLegend() {
-            let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
-            let showKabLines = selectShowKab.value === 'ya', symbology = selectSymbology.value, fillColor = inputFillColor.value;
-            let html = '';
-            
-            if (!selectedProv) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.6; border:1px solid #000;"></span> Seluruh Indonesia<br>`;
-            } else if (selectedDesa) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:#e67e22; opacity:0.7; border:1px solid #d35400;"></span> Kel. ${selectedDesa}<br>`;
-            } else if (selectedKab) {
-                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #000;"></span> ${selectedKab}<br>`;
-            } else {
-                if(symbology === 'categorized') {
-                    if (currentGeoJsonFeatures.length > 0) {
-                        html += `<b>Keterangan Wilayah:</b><br>`;
-                        currentGeoJsonFeatures.forEach(feat => {
-                            let namaKab = feat.properties.WADMKK;
-                            let idx = currentDistrictList.indexOf(namaKab);
-                            let featColor = (idx !== -1) ? colorPalette[idx % colorPalette.length] : fillColor;
-                            html += `<span style="display:inline-block; width:10px; height:10px; background:${featColor}; opacity:0.8; border:1px solid #333; margin-top:2px;"></span> ${namaKab}<br>`;
-                        });
-                    }
-                } else {
-                    html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
-                }
-                if(showKabLines) html += `<span style="display:inline-block; width:10px; height:2px; background:#222; vertical-align:middle; margin-top:4px; margin-bottom:2px;"></span> Batas Kabupaten/Kota<br>`;
-            }
-
-            customMarkers.forEach(cm => {
-                html += `<div style="margin-top:3px; display:flex; align-items:center; gap:5px;"><span>${getMarkerHtml(cm.shape, cm.color, cm.label)}</span> <span>${cm.label}</span></div>`;
-            });
-            dynamicLegend.innerHTML = html;
-        }
-
-        // --- UPDATE TAMPILAN PETA UTAMA ---
+        // --- UPDATE TAMPILAN MAP & MASKING UTAMA ---
         function updateMapDisplay() {
             let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
             let showKabLines = selectShowKab.value === 'ya', showLabels = selectShowLabel.value === 'ya', maskMode = selectMasking.value;
@@ -769,7 +679,7 @@
             }
 
             // Jika Desa Dipilih
-            if (selectedDesa && desaData) {
+            if (selectedDesa && desaDataLoaded && desaData) {
                 infoWilayah.innerHTML = `<b>Provinsi:</b> ${selectedProv}<br><b>Kab/Kota:</b> ${selectedKab}<br><b>Desa/Kel:</b> ${selectedDesa}<br><b>Proyeksi:</b> WGS 84`;
                 updateLegend();
 
@@ -854,26 +764,51 @@
             if (activeLayer.getLayers().length > 0) map.fitBounds(activeLayer.getBounds());
         }
 
-        // --- EVENT LISTENER BERJENJANG (PROVINSI -> KABUPATEN -> DESA) ---
-        selectProvinsi.addEventListener('change', function() {
-            let selectedProv = this.value;
-            selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>'; selectKabupaten.disabled = true;
+        // --- UPDATE LEGENDA LENGKAP ---
+        function updateLegend() {
+            let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, selectedDesa = selectDesa.value;
+            let showKabLines = selectShowKab.value === 'ya', symbology = selectSymbology.value, fillColor = inputFillColor.value;
+            let html = '';
             
-            // Reset state desa
-            if (!desaDataLoaded) {
-                selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
-                selectDesa.classList.add('loading');
-                selectDesa.disabled = true;
+            if (!selectedProv) {
+                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.6; border:1px solid #000;"></span> Seluruh Indonesia<br>`;
+            } else if (selectedDesa) {
+                html += `<span style="display:inline-block; width:10px; height:10px; background:#e67e22; opacity:0.7; border:1px solid #d35400;"></span> Kel. ${selectedDesa}<br>`;
+            } else if (selectedKab) {
+                html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #000;"></span> ${selectedKab}<br>`;
             } else {
-                selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
-                selectDesa.classList.remove('loading');
-                selectDesa.disabled = true;
+                if(symbology === 'categorized') {
+                    if (currentGeoJsonFeatures.length > 0) {
+                        html += `<b>Keterangan Wilayah:</b><br>`;
+                        currentGeoJsonFeatures.forEach(feat => {
+                            let namaKab = feat.properties.WADMKK;
+                            let idx = currentDistrictList.indexOf(namaKab);
+                            let featColor = (idx !== -1) ? colorPalette[idx % colorPalette.length] : fillColor;
+                            html += `<span style="display:inline-block; width:10px; height:10px; background:${featColor}; opacity:0.8; border:1px solid #333; margin-top:2px;"></span> ${namaKab}<br>`;
+                        });
+                    }
+                } else {
+                    html += `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.5; border:1px solid #000;"></span> Wilayah Provinsi<br>`;
+                }
+                if(showKabLines) html += `<span style="display:inline-block; width:10px; height:2px; background:#222; vertical-align:middle; margin-top:4px; margin-bottom:2px;"></span> Batas Kabupaten/Kota<br>`;
             }
+
+            customMarkers.forEach(cm => {
+                html += `<div style="margin-top:3px; display:flex; align-items:center; gap:5px;"><span>${getMarkerHtml(cm.shape, cm.color, cm.label)}</span> <span>${cm.label}</span></div>`;
+            });
+            dynamicLegend.innerHTML = html;
+        }
+
+        // --- EVENT LISTENER BERJENJANG (PROVINSI -> KABUPATEN -> DESA/API) ---
+        selectProvinsi.addEventListener('change', function() {
+            let prov = this.value;
+            selectKabupaten.innerHTML = '<option value="">-- Semua Kabupaten/Kota --</option>'; selectKabupaten.disabled = true;
+            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>'; selectDesa.disabled = true;
             
-            if (!selectedProv || !kabupatenData) { updateMapDisplay(); return; }
+            if (!prov || !kabupatenData) { updateMapDisplay(); return; }
 
             let kabSet = new Set();
-            kabupatenData.features.forEach(f => { if (f.properties.WADMPR === selectedProv && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
+            kabupatenData.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
             currentDistrictList = Array.from(kabSet).sort();
             currentDistrictList.forEach(kab => { let opt = document.createElement('option'); opt.value = kab; opt.textContent = kab; selectKabupaten.appendChild(opt); });
             selectKabupaten.disabled = false;
@@ -881,18 +816,62 @@
         });
 
         selectKabupaten.addEventListener('change', function() {
-            let selectedKab = this.value;
+            let kab = this.value;
             
-            if (!desaDataLoaded) {
-                 selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
-                 selectDesa.classList.add('loading');
-                 selectDesa.disabled = true;
-            } else {
-                 populateDesaDropdown(selectedKab);
+            // Tampilkan Loading
+            selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
+            selectDesa.classList.add('loading');
+            selectDesa.disabled = true;
+            msgLoading.style.display = 'block';
+            msgLoading.style.color = '#e74c3c';
+            msgLoading.innerText = 'Sedang mengambil data dari database...';
+            desaDataLoaded = false;
+            desaData = null;
+            
+            updateMapDisplay(); // Update peta ke level Kabupaten dulu
+
+            if (!kab) {
+                selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Terlebih Dahulu --</option>';
+                selectDesa.classList.remove('loading');
+                msgLoading.style.display = 'none';
+                return;
             }
-            
-            updateMapDisplay();
+
+            // Panggil API (Kirim parameter kabupaten ke backend Vercel)
+            fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("Gagal mengambil API");
+                    return res.json();
+                })
+                .then(data => {
+                    desaData = data;
+                    desaDataLoaded = true;
+                    selectDesa.classList.remove('loading');
+                    msgLoading.style.display = 'none';
+                    populateDesaDropdown();
+                })
+                .catch(err => {
+                    msgLoading.innerText = 'Gagal memuat desa dari database (Cek koneksi API).';
+                    selectDesa.innerHTML = '<option value="">-- Error Database --</option>';
+                    selectDesa.classList.remove('loading');
+                });
         });
+
+        function populateDesaDropdown() {
+            selectDesa.innerHTML = '<option value="">-- Pilih Kelurahan/Desa --</option>'; 
+            if (!desaData || !desaData.features) return;
+            
+            let desaSet = new Set();
+            // Data sudah difilter oleh backend, tinggal ambil nama desanya
+            desaData.features.forEach(f => {
+                if (f.properties.NAMOBJ) desaSet.add(f.properties.NAMOBJ);
+            });
+
+            Array.from(desaSet).sort().forEach(desa => {
+                let opt = document.createElement('option'); opt.value = desa; opt.textContent = desa; selectDesa.appendChild(opt);
+            });
+            selectDesa.disabled = false;
+        }
 
         selectDesa.addEventListener('change', updateMapDisplay);
 
