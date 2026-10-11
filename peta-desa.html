@@ -7,8 +7,7 @@
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Select2 CSS untuk Fitur Search & Scroll di Dropdown -->
+    <!-- Select2 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     
     <style>
@@ -110,7 +109,7 @@
                 <select id="select-desa" class="select2-enable" disabled>
                     <option value="">-- Pilih Kabupaten Dahulu --</option>
                 </select>
-                <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: none; margin-top: 4px;">Sedang memuat data dari database...</small>
+                <small id="desa-loading-msg" style="color: #2980b9; font-size: 8px; display: none; margin-top: 4px;">Sedang memuat data dari database...</small>
             </div>
         </div>
 
@@ -347,6 +346,13 @@
 
         let desaData = null;
         let layerDesa = null;
+        
+        // Data Fallback (Cadangan Lokal)
+        let localDataFallback = null;
+        fetch('data/38 Provinsi Indonesia - Kabupaten.json')
+            .then(res => res.json())
+            .then(data => localDataFallback = data)
+            .catch(e => console.warn("File JSON cadangan tidak ditemukan."));
 
         const selectProvinsi = document.getElementById('select-provinsi');
         const selectKabupaten = document.getElementById('select-kabupaten');
@@ -364,27 +370,30 @@
             $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
         });
 
-        // 1. Load Provinsi LANGSUNG dari API Database
+        // 1. Load Provinsi LANGSUNG dari API Database (Dengan Cadangan JSON)
         fetch('/api/get-wilayah')
-            .then(res => res.json())
+            .then(res => {
+                if(!res.ok) throw new Error("API Timeout");
+                return res.json();
+            })
             .then(provinces => {
                 selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
                 if(provinces && provinces.length > 0) {
-                    provinces.forEach(prov => {
-                        selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`;
-                    });
-                } else {
-                    selectProvinsi.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                    provinces.forEach(prov => selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`);
                 }
-                $('#select-provinsi').trigger('change.select2'); // Update UI Select2
+                $('#select-provinsi').trigger('change.select2');
             })
             .catch(err => {
-                console.error("Error loading provinsi:", err);
-                selectProvinsi.innerHTML = '<option value="">-- Error Database --</option>';
+                console.warn("API Database lambat, menggunakan data cadangan lokal...");
+                selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
+                if(localDataFallback) {
+                    let provinces = [...new Set(localDataFallback.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
+                    provinces.forEach(prov => selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`);
+                }
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten LANGSUNG dari API Database ketika Provinsi dipilih
+        // 2. Load Kabupaten LANGSUNG dari API Database ketika Provinsi dipilih (Dengan Cadangan JSON)
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
@@ -400,19 +409,26 @@
             $('#select-kabupaten').trigger('change.select2');
 
             fetch(`/api/get-wilayah?provinsi=${encodeURIComponent(prov)}`)
-                .then(res => res.json())
+                .then(res => {
+                    if(!res.ok) throw new Error("API Timeout");
+                    return res.json();
+                })
                 .then(kabupatens => {
                     selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
-                    kabupatens.forEach(kab => {
-                        selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`;
-                    });
+                    kabupatens.forEach(kab => selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`);
                     selectKabupaten.disabled = false;
-                    $('#select-kabupaten').trigger('change.select2'); // Update UI Select2
+                    $('#select-kabupaten').trigger('change.select2'); 
                     $('#select-desa').trigger('change.select2');
                 })
                 .catch(err => {
-                    console.error("Error loading kabupaten:", err);
-                    selectKabupaten.innerHTML = '<option value="">-- Error Database --</option>';
+                    console.warn("API Database lambat, menggunakan data cadangan lokal untuk kabupaten...");
+                    selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
+                    if(localDataFallback) {
+                        let kabSet = new Set();
+                        localDataFallback.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
+                        Array.from(kabSet).sort().forEach(kab => selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`);
+                        selectKabupaten.disabled = false;
+                    }
                     $('#select-kabupaten').trigger('change.select2');
                 });
         });
@@ -425,6 +441,7 @@
             $('#select-desa').trigger('change.select2'); // Kunci sementara
             
             msgLoading.style.display = 'block';
+            msgLoading.innerText = 'Mengambil koordinat desa dari server...';
             desaData = null;
 
             if (!kab) {
@@ -453,7 +470,7 @@
                     msgLoading.style.display = 'none';
                 })
                 .catch(err => {
-                    msgLoading.innerText = 'Gagal memuat desa.';
+                    msgLoading.innerText = 'Gagal memuat desa. Harap muat ulang halaman.';
                     selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>';
                     $('#select-desa').trigger('change.select2');
                 });

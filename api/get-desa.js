@@ -18,6 +18,7 @@ module.exports = async (req, res) => {
     }
 
     try {
+        // Menggunakan "WADMKK" dengan kutip ganda
         const query = `
             SELECT jsonb_build_object(
                 'type',     'FeatureCollection',
@@ -31,16 +32,16 @@ module.exports = async (req, res) => {
               ) AS feature
               FROM (
                 SELECT * FROM batas_wilayah 
-                WHERE WADMKK ILIKE $1 
+                WHERE "WADMKK" = $1 
               ) inputs
             ) features;
         `;
         
-        const { rows } = await pool.query(query, [`%${kabupaten}%`]);
+        const { rows } = await pool.query(query, [kabupaten]);
         res.status(200).json(rows[0].geojson);
         
     } catch (error) {
         console.error("Database Error:", error);
-        res.status(500).json({ error: "Gagal mengambil data dari database" });
+        res.status(500).json({ error: "Gagal mengambil data dari database", details: error.message });
     }
 };
