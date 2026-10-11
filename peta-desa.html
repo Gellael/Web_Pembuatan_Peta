@@ -87,7 +87,7 @@
 
     <div id="sidebar">
         <a href="index.html" class="back-link">← Kembali ke Dashboard</a>
-        <h2 class="brand-title">🗺️ Pembuat Peta Administrasi</h2>
+        <h2 class="brand-title">Pembuat Peta Administrasi</h2>
         
         <!-- STEP 1: LOKASI PETA DENGAN FITUR PENCARIAN & SCROLL -->
         <div class="control-card">
@@ -113,11 +113,16 @@
             </div>
         </div>
 
-        <!-- STEP 2: IDENTITAS -->
+        <!-- STEP 2: IDENTITAS & LEGENDA -->
         <div class="control-card">
-            <h3 class="card-step-title">2. Identitas Peta</h3>
+            <h3 class="card-step-title">2. Identitas Peta & Legenda</h3>
             <div class="form-group"><label>Judul Utama Peta</label><input type="text" id="input-judul" value="PETA ADMINISTRASI WILAYAH INDONESIA"></div>
             <div class="form-group"><label>Sub Judul / Keterangan</label><input type="text" id="input-subjudul" value="Sumber Data: Peta GeoJSON WebGIS Nasional"></div>
+            
+            <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
+                <label style="color: #27ae60;">📝 Teks Legenda Wilayah (Opsional)</label>
+                <input type="text" id="input-teks-legenda" placeholder="Kosongkan agar otomatis nama Desa">
+            </div>
         </div>
 
         <!-- STEP 3: SIMBOLOGI & BATAS WILAYAH -->
@@ -159,7 +164,7 @@
             </div>
         </div>
 
-        <!-- STEP 4: LABEL & MASKING -->
+        <!-- STEP 4: LABEL & MASKING (DISEMPURNAKAN) -->
         <div class="control-card">
             <h3 class="card-step-title">4. Label Teks & Masking</h3>
             <div style="display: flex; gap: 5px;">
@@ -185,6 +190,17 @@
                         <option value="besar">Besar</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- FITUR MASKING BARU -->
+            <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
+                <label style="color: #8e44ad;">🌒 Efek Penggelapan (Masking Luar Wilayah)</label>
+                <select id="select-masking">
+                    <option value="tidak">Tanpa Efek (Normal)</option>
+                    <option value="0.4">Gelap Transparan (40%)</option>
+                    <option value="0.6" selected>Gelap Sedang (60%)</option>
+                    <option value="0.85">Gelap Pekat (85%)</option>
+                </select>
             </div>
         </div>
 
@@ -257,7 +273,7 @@
                         <input type="color" id="input-marker-color" value="#e74c3c" style="height: 24px; cursor: pointer; padding:0;">
                     </div>
                 </div>
-                <button class="btn-action btn-marker" onclick="toggleMarkerMode()">📍 Klik Peta untuk Taruh Pin</button>
+                <button class="btn-action btn-marker" onclick="toggleMarkerMode()">Klik Peta untuk Taruh Pin</button>
             </div>
         </div>
 
@@ -272,12 +288,12 @@
                 <label>2. Teks Keterangan Gambar</label>
                 <input type="text" id="input-annot-text" placeholder="Misal: Lahan Kosong Rencana X">
             </div>
-            <button class="btn-action btn-annot" onclick="toggleAnnotationMode()">🖼️ Klik Peta untuk Taruh Gambar</button>
+            <button class="btn-action btn-annot" onclick="toggleAnnotationMode()">Klik Peta untuk Taruh Gambar</button>
             <p style="font-size: 8px; color: #7f8c8d; margin-top: 4px; line-height: 1.3;">*Gambar bisa di-klik & ditahan untuk digeser (drag) posisinya di atas peta.</p>
         </div>
 
-        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()" style="margin-top: 15px;">📥 Download Kanvas Peta (PNG)</button>
-        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">🖨️ Cetak / Ekspor PDF</button>
+        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()" style="margin-top: 15px;">Download Kanvas Peta (PNG)</button>
+        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">Cetak / Ekspor PDF</button>
         <br><br>
     </div>
 
@@ -339,20 +355,17 @@
     <script>
         document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
         document.getElementById('input-subjudul').addEventListener('input', e => document.getElementById('header-subjudul').innerText = e.target.value);
+        document.getElementById('input-teks-legenda').addEventListener('input', updateLegendDisplay);
 
-        // --- INISIALISASI PETA UTAMA ---
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
 
         let desaData = null;
         let layerDesa = null;
+        let maskLayer = null; // Variabel baru untuk menampung efek gelap (masking)
         
-        // Data Fallback (Cadangan Lokal)
         let localDataFallback = null;
-        fetch('data/38 Provinsi Indonesia - Kabupaten.json')
-            .then(res => res.json())
-            .then(data => localDataFallback = data)
-            .catch(e => console.warn("File JSON cadangan tidak ditemukan."));
+        fetch('data/38 Provinsi Indonesia - Kabupaten.json').then(res => res.json()).then(data => localDataFallback = data).catch(e => console.warn("Fallback JSON tidak ditemukan."));
 
         const selectProvinsi = document.getElementById('select-provinsi');
         const selectKabupaten = document.getElementById('select-kabupaten');
@@ -361,30 +374,21 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        // --- AKTIFKAN FITUR SELECT2 PADA DROPDOWN ---
-        $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
-
-            // Menghubungkan Select2 dengan Event Listener Vanilla JS
-            $('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
+        $(document).ready(function() {
+            $('.select2-enable').select2({ width: '100\%' });$('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
             $('#select-kabupaten').on('select2:select', function () { selectKabupaten.dispatchEvent(new Event('change')); });
             $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
         });
 
-        // 1. Load Provinsi LANGSUNG dari API Database (Dengan Cadangan JSON)
+        // 1. Load Provinsi
         fetch('/api/get-wilayah')
-            .then(res => {
-                if(!res.ok) throw new Error("API Timeout");
-                return res.json();
-            })
+            .then(res => { if(!res.ok) throw new Error("API Timeout"); return res.json(); })
             .then(provinces => {
                 selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-                if(provinces && provinces.length > 0) {
-                    provinces.forEach(prov => selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`);
-                }
+                if(provinces && provinces.length > 0) { provinces.forEach(prov => selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`); }
                 $('#select-provinsi').trigger('change.select2');
             })
             .catch(err => {
-                console.warn("API Database lambat, menggunakan data cadangan lokal...");
                 selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
                 if(localDataFallback) {
                     let provinces = [...new Set(localDataFallback.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
@@ -393,35 +397,26 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten LANGSUNG dari API Database ketika Provinsi dipilih (Dengan Cadangan JSON)
+        // 2. Load Kabupaten
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
             selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Dahulu --</option>'; selectDesa.disabled = true;
             
-            if (!prov) {
-                $('#select-kabupaten').trigger('change.select2');
-                $('#select-desa').trigger('change.select2');
-                return;
-            }
+            if (!prov) { $('#select-kabupaten').trigger('change.select2'); $('#select-desa').trigger('change.select2'); return; }
 
             selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
             $('#select-kabupaten').trigger('change.select2');
 
             fetch(`/api/get-wilayah?provinsi=${encodeURIComponent(prov)}`)
-                .then(res => {
-                    if(!res.ok) throw new Error("API Timeout");
-                    return res.json();
-                })
+                .then(res => { if(!res.ok) throw new Error("API Timeout"); return res.json(); })
                 .then(kabupatens => {
                     selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
                     kabupatens.forEach(kab => selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`);
                     selectKabupaten.disabled = false;
-                    $('#select-kabupaten').trigger('change.select2'); 
-                    $('#select-desa').trigger('change.select2');
+                    $('#select-kabupaten').trigger('change.select2'); $('#select-desa').trigger('change.select2');
                 })
                 .catch(err => {
-                    console.warn("API Database lambat, menggunakan data cadangan lokal untuk kabupaten...");
                     selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
                     if(localDataFallback) {
                         let kabSet = new Set();
@@ -433,21 +428,17 @@
                 });
         });
 
-        // 3. Load Desa dari database ketika Kabupaten dipilih
+        // 3. Load Desa
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             selectDesa.innerHTML = '<option value="">-- Memuat Data... --</option>';
             selectDesa.disabled = true;
-            $('#select-desa').trigger('change.select2'); // Kunci sementara
-            
+            $('#select-desa').trigger('change.select2');
             msgLoading.style.display = 'block';
             msgLoading.innerText = 'Mengambil koordinat desa dari server...';
             desaData = null;
 
-            if (!kab) {
-                msgLoading.style.display = 'none';
-                return;
-            }
+            if (!kab) { msgLoading.style.display = 'none'; return; }
 
             fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
                 .then(res => res.json())
@@ -455,33 +446,35 @@
                     desaData = data;
                     selectDesa.innerHTML = '<option value="">-- Cari / Pilih Desa --</option>';
                     let desaSet = new Set();
-                    if (data && data.features) {
-                        data.features.forEach(f => {
-                            let namaDesa = f.properties.WADMKD || f.properties.wadmkd;
-                            if (namaDesa) desaSet.add(namaDesa);
-                        });
-                    }
-                    Array.from(desaSet).sort().forEach(desa => {
-                        selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`;
-                    });
+                    if (data && data.features) { data.features.forEach(f => { let namaDesa = f.properties.WADMKD || f.properties.wadmkd; if (namaDesa) desaSet.add(namaDesa); }); }
+                    Array.from(desaSet).sort().forEach(desa => { selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`; });
                     
-                    selectDesa.disabled = false;
-                    $('#select-desa').trigger('change.select2'); // Perbarui UI dengan List Baru
-                    msgLoading.style.display = 'none';
+                    selectDesa.disabled = false; $('#select-desa').trigger('change.select2'); msgLoading.style.display = 'none';
                 })
                 .catch(err => {
                     msgLoading.innerText = 'Gagal memuat desa. Harap muat ulang halaman.';
-                    selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>';
-                    $('#select-desa').trigger('change.select2');
+                    selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>'; $('#select-desa').trigger('change.select2');
                 });
         });
 
-        // 4. Update Tampilan Peta saat Desa Dipilih / Warna Diubah
+        function updateLegendDisplay() {
+            const fillColor = document.getElementById('input-fill-color').value;
+            const selectedDesa = document.getElementById('select-desa').value;
+            const customText = document.getElementById('input-teks-legenda').value.trim();
+
+            let legendText = "Seluruh Indonesia";
+            if (customText !== "") { legendText = customText; } else if (selectedDesa) { legendText = `Kel. ${selectedDesa}`; }
+            dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}`;
+        }
+
+        // 4. Update Tampilan Peta (Dengan Logika MASKING)
         function updateMapDisplay() {
             let selectedDesa = selectDesa.value;
             if (!desaData || !desaData.features || !selectedDesa) return;
 
+            // Bersihkan layer sebelumnya
             if (layerDesa) map.removeLayer(layerDesa);
+            if (maskLayer) map.removeLayer(maskLayer); // Bersihkan masking lama
             labelLayer.clearLayers();
 
             let fillColor = document.getElementById('input-fill-color').value;
@@ -489,13 +482,23 @@
             let weightVal = parseFloat(document.getElementById('select-weight').value);
             let dashVal = document.getElementById('select-dash').value;
             let showLabels = document.getElementById('select-show-label').value === 'ya';
+            let maskingVal = document.getElementById('select-masking').value; // Mengambil level efek masking
+            
+            // Konfigurasi Label Text yang Dinamis
+            let labelColor = document.getElementById('select-label-color').value === 'putih' ? '#ffffff' : '#000000';
+            let labelBg = document.getElementById('select-label-color').value === 'putih' ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
+            let labelSizeVal = document.getElementById('select-label-size').value;
+            let labelFontSize = labelSizeVal === 'kecil' ? '7px' : (labelSizeVal === 'besar' ? '12px' : '9px');
 
-            // Filter akurat karena nilai didapat langsung dari opsi Select2
+            let matchedFeature = null;
+
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
                     let des = p.WADMKD || p.wadmkd || '';
-                    return des === selectedDesa;
+                    let isMatch = (des === selectedDesa);
+                    if (isMatch) matchedFeature = f; // Menyimpan feature wilayah yg dipilih
+                    return isMatch;
                 },
                 style: { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal },
                 onEachFeature: function(feature, layer) {
@@ -505,28 +508,55 @@
                     let prov = p.WADMPR || p.wadmpr || '-';
 
                     infoWilayah.innerHTML = `<b>Provinsi:</b> ${prov}<br><b>Kab/Kota:</b> ${kab}<br><b>Desa/Kel:</b> ${desa}<br><b>Proyeksi:</b> WGS 84`;
-                    dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> Kel. ${desa}`;
+                    updateLegendDisplay();
 
                     if (showLabels) {
                         try {
                             let pt = turf.pointOnFeature(feature);
                             let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-                            let htmlContent = `<div class="region-label" style="font-size:9px;">${desa}</div>`;
-                            labelLayer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [100, 15], iconAnchor: [50, 7] }), draggable: true }));
+                            let htmlContent = `<div class="region-label" style="font-size:${labelFontSize}; color:${labelColor}; background:${labelBg}; padding:3px 6px; border-radius:3px; display:inline-block; border:1px solid ${labelColor}; box-shadow: 1px 1px 3px rgba(0,0,0,0.4);">${desa}</div>`;
+                            labelLayer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [150, 25], iconAnchor: [75, 12] }), draggable: true }));
                         } catch(e){}
                     }
                 }
             }).addTo(map);
+
+            // LOGIKA MASKING PENGGELAPAN LUAR WILAYAH DENGAN TURF.JS
+            if (maskingVal !== "tidak" && matchedFeature) {
+                try {
+                    // Turf.mask otomatis melubangi bounding box dunia dengan batas wilayah terpilih
+                    let maskGeoJSON = turf.mask(matchedFeature); 
+                    maskLayer = L.geoJSON(maskGeoJSON, {
+                        style: {
+                            fillColor: '#000000', // Warna gelap
+                            fillOpacity: parseFloat(maskingVal), // Tingkat kegelapan sesuai pilihan
+                            weight: 0, // Tanpa batas garis agar mulus
+                            color: 'transparent'
+                        },
+                        interactive: false // Sangat Penting: agar basemap di bawahnya tetap bisa di-klik & drag
+                    }).addTo(map);
+                    
+                    // Pastikan layer desa dan label teks berada DI ATAS lapisan kegelapan
+                    maskLayer.bringToBack(); 
+                    layerDesa.bringToFront(); 
+                } catch(e) {
+                    console.warn("Gagal membuat masking Turf.js:", e);
+                }
+            }
 
             if (layerDesa.getLayers().length > 0) {
                 map.fitBounds(layerDesa.getBounds());
             }
         }
 
-        // Jalankan fungsi update peta ketika desa dipilih atau styling diubah
         selectDesa.addEventListener('change', updateMapDisplay);
-        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label'].forEach(id => {
-            document.getElementById(id).addEventListener('change', updateMapDisplay);
+        
+        // Memasukkan select-masking ke daftar pemicu update peta
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                updateMapDisplay();
+                updateLegendDisplay(); 
+            });
         });
 
         // --- BASES & EKSPOR ---

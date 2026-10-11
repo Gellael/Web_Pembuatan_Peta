@@ -75,7 +75,7 @@
 
     <div id="sidebar">
         <a href="index.html" class="back-link">← Kembali ke Dashboard Utama</a>
-        <h2 class="brand-title" style="color: var(--accent); border-color: var(--accent);">🎯 Modul Analisis Radius</h2>
+        <h2 class="brand-title" style="color: var(--accent); border-color: var(--accent);">Modul Analisis Radius</h2>
         
         <!-- STEP 1: LOKASI DASAR PETA -->
         <div class="control-card">
@@ -128,7 +128,7 @@
                     <input type="color" id="input-buffer-color" value="#8e44ad" style="height: 28px; cursor: pointer; padding:0;">
                 </div>
             </div>
-            <button class="btn-action btn-marker" onclick="toggleBufferMode()">🎯 Klik Peta Untuk Buat Radius</button>
+            <button class="btn-action btn-marker" onclick="toggleBufferMode()">Klik Peta Untuk Buat Radius</button>
             <p style="font-size:8px; color:#7f8c8d; text-align:center; margin: 4px 0 0;">(Klik pada peta untuk menaruh titik, lingkaran jangkauan akan terbentuk otomatis)</p>
         </div>
 
@@ -150,8 +150,8 @@
             </div>
         </div>
 
-        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()">📥 Download Kanvas Peta (PNG)</button>
-        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">🖨️ Cetak / Ekspor PDF</button>
+        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()">Download Kanvas Peta (PNG)</button>
+        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">Cetak / Ekspor PDF</button>
     </div>
 
     <!-- Kanvas Peta -->
@@ -281,9 +281,9 @@
             isAddingBuffer = !isAddingBuffer;
             const btn = document.querySelector('.btn-marker');
             if (isAddingBuffer) {
-                btn.style.background = '#e74c3c'; btn.innerText = '🛑 Batalkan Mode Titik Radius'; map.getContainer().style.cursor = 'crosshair';
+                btn.style.background = '#e74c3c'; btn.innerText = 'Batalkan Mode Titik Radius'; map.getContainer().style.cursor = 'crosshair';
             } else {
-                btn.style.background = '#8e44ad'; btn.innerText = '🎯 Klik Peta Untuk Buat Radius'; map.getContainer().style.cursor = '';
+                btn.style.background = '#8e44ad'; btn.innerText = 'Klik Peta Untuk Buat Radius'; map.getContainer().style.cursor = '';
             }
         }
 
