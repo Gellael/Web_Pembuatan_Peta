@@ -399,7 +399,7 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten menggunakan event Select2 agar responsif dan bisa diklik
+        // 2. Load Kabupaten ketika Provinsi dipilih
         $('#select-provinsi').on('select2:select', function (e) {
             let prov = e.params.data.id;
             selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
@@ -422,7 +422,7 @@
                 });
         });
 
-        // 3. Load Desa menggunakan event Select2 agar responsif dan bisa diklik
+        // 3. Load Desa ketika Kabupaten dipilih dan sinkronkan nilainya
         $('#select-kabupaten').on('select2:select', function (e) {
             let kab = e.params.data.id;
             selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
@@ -463,8 +463,10 @@
                 });
         });
 
-        // 4. Trigger pembaruan peta saat desa dipilih lewat Select2
+        // 4. Tangkap event pemilihan desa dengan Select2 secara akurat
         $('#select-desa').on('select2:select', function (e) {
+            let selectedValue = e.params.data.id;
+            selectDesa.value = selectedValue; // Memastikan nilai elemen DOM ikut terupdate
             updateMapDisplay();
         });
 
