@@ -95,11 +95,15 @@
             <h3 class="card-step-title">1. Lokasi Pemetaan</h3>
             <div class="form-group">
                 <label>Provinsi</label>
-                <select id="select-provinsi" class="select2-enable"><option value="">-- Pilih Provinsi --</option></select>
+                <select id="select-provinsi" class="select2-enable">
+                    <option value="">-- Memuat Provinsi... --</option>
+                </select>
             </div>
             <div class="form-group">
                 <label>Kabupaten/Kota</label>
-                <select id="select-kabupaten" class="select2-enable" disabled><option value="">-- Pilih Provinsi Dahulu --</option></select>
+                <select id="select-kabupaten" class="select2-enable" disabled>
+                    <option value="">-- Pilih Provinsi Dahulu --</option>
+                </select>
             </div>
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
                 <label style="color: #d35400;">📍 Kelurahan / Desa (Cari & Pilih)</label>
@@ -341,7 +345,7 @@
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
 
-        let kabupatenData = null, desaData = null;
+        let desaData = null;
         let layerDesa = null;
 
         const selectProvinsi = document.getElementById('select-provinsi');
@@ -360,39 +364,57 @@
             $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
         });
 
-        // 1. Load Provinsi dari JSON lokal
-        fetch('data/38 Provinsi Indonesia - Kabupaten.json')
+        // 1. Load Provinsi LANGSUNG dari API Database
+        fetch('/api/get-wilayah')
             .then(res => res.json())
-            .then(data => {
-                kabupatenData = data;
-                let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
+            .then(provinces => {
                 selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
-                provinces.forEach(prov => {
-                    selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`;
-                });
+                if(provinces && provinces.length > 0) {
+                    provinces.forEach(prov => {
+                        selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`;
+                    });
+                } else {
+                    selectProvinsi.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                }
                 $('#select-provinsi').trigger('change.select2'); // Update UI Select2
+            })
+            .catch(err => {
+                console.error("Error loading provinsi:", err);
+                selectProvinsi.innerHTML = '<option value="">-- Error Database --</option>';
+                $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten ketika Provinsi dipilih
+        // 2. Load Kabupaten LANGSUNG dari API Database ketika Provinsi dipilih
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
             selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Dahulu --</option>'; selectDesa.disabled = true;
             
-            if (!prov || !kabupatenData) {
+            if (!prov) {
                 $('#select-kabupaten').trigger('change.select2');
                 $('#select-desa').trigger('change.select2');
                 return;
             }
 
-            let kabSet = new Set();
-            kabupatenData.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
-            Array.from(kabSet).sort().forEach(kab => {
-                selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`;
-            });
-            selectKabupaten.disabled = false;
-            $('#select-kabupaten').trigger('change.select2'); // Update UI Select2
-            $('#select-desa').trigger('change.select2');
+            selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
+            $('#select-kabupaten').trigger('change.select2');
+
+            fetch(`/api/get-wilayah?provinsi=${encodeURIComponent(prov)}`)
+                .then(res => res.json())
+                .then(kabupatens => {
+                    selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
+                    kabupatens.forEach(kab => {
+                        selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`;
+                    });
+                    selectKabupaten.disabled = false;
+                    $('#select-kabupaten').trigger('change.select2'); // Update UI Select2
+                    $('#select-desa').trigger('change.select2');
+                })
+                .catch(err => {
+                    console.error("Error loading kabupaten:", err);
+                    selectKabupaten.innerHTML = '<option value="">-- Error Database --</option>';
+                    $('#select-kabupaten').trigger('change.select2');
+                });
         });
 
         // 3. Load Desa dari database ketika Kabupaten dipilih
