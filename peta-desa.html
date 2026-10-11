@@ -59,7 +59,6 @@
         .map-element h4 { margin: 0 0 3px 0; font-size: 9px; border-bottom: 1px solid #000000; padding-bottom: 2px; text-align: center; font-weight: bold; color: #000000; text-transform: uppercase; }
         .north-arrow { text-align: center; font-size: 15px; font-weight: bold; }
         
-        /* Kotak Peta Inset / Mini Map */
         #mini-map-box { width: 100%; height: 95px; border: 1px solid #000000; background: #fff; box-sizing: border-box; position: relative; }
 
         .btn-action { color: white; border: none; padding: 8px; width: 100%; font-weight: bold; border-radius: 4px; cursor: pointer; text-align: center; margin-top: 6px; font-size: 11px; transition: background 0.2s; }
@@ -181,9 +180,9 @@
                 <label style="color: #8e44ad;">🌒 Efek Penggelapan (Masking Luar)</label>
                 <select id="select-masking">
                     <option value="tidak">Tanpa Efek (Normal)</option>
-                    <option value="0.4">Gelap Transparan (40%)</option>
-                    <option value="0.6" selected>Gelap Sedang (60%)</option>
-                    <option value="0.85">Gelap Pekat (85%)</option>
+                    <option value="0.3">Gelap Tipis (30%)</option>
+                    <option value="0.5" selected>Gelap Sedang (50%)</option>
+                    <option value="0.75">Gelap Pekat (75%)</option>
                 </select>
             </div>
         </div>
@@ -195,7 +194,7 @@
                 <label>Peta Latar (Basemap)</label>
                 <select id="select-basemap">
                     <option value="osm">OpenStreetMap Standard</option>
-                    <option value="satellite">Esri World Imagery</option>
+                    <option value="satellite" selected>Esri World Imagery</option>
                     <option value="topo">OpenTopoMap</option>
                     <option value="dark">CartoDB Dark</option>
                     <option value="positron">CartoDB Positron</option>
@@ -280,7 +279,6 @@
             
             <div class="map-frame-wrapper">
                 <div id="map"></div>
-                <!-- Border Zebra / Garis Luar -->
                 <div class="border-zebra-top" id="zebra-t"></div>
                 <div class="border-zebra-bottom" id="zebra-b"></div>
                 <div class="border-zebra-left" id="zebra-l"></div>
@@ -335,6 +333,31 @@
         // --- INISIALISASI PETA UTAMA ---
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
+
+        // --- BASEMAPS DEFINITION ---
+        const basemaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }),
+            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, crossOrigin: true }),
+            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            positron: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            hot: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
+            toner: L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true }),
+            voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
+            cyclosm: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true }),
+            natgeo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, crossOrigin: true }),
+            terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, crossOrigin: true }),
+            humanitarian: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true })
+        };
+        let currentBasemap = basemaps.satellite.addTo(map); // Default set ke Satelit
+
+        document.getElementById('select-basemap').addEventListener('change', function() {
+            if (currentBasemap) map.removeLayer(currentBasemap);
+            currentBasemap = (basemaps[this.value] || basemaps.osm).addTo(map);
+            if (maskLayer) maskLayer.bringToFront();
+            if (layerDesa) layerDesa.bringToFront();
+            if (labelLayer) labelLayer.bringToFront();
+        });
 
         // --- INISIALISASI PETA INSET (MINI-MAP) ---
         var miniMap = L.map('mini-map-box', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([-0.7893, 113.9213], 4);
@@ -478,13 +501,31 @@
 
             let matchedFeature = null;
 
+            // 1. Tampilkan Masking (Penggelapan Luar) terlebih dahulu agar berada tepat di atas Basemap
+            if (maskingVal !== "tidak") {
+                // Cari feature desa yang dipilih untuk dilubangi
+                desaData.features.forEach(f => {
+                    let des = f.properties.WADMKD || f.properties.wadmkd || '';
+                    if (des === selectedDesa) matchedFeature = f;
+                });
+
+                if (matchedFeature) {
+                    try {
+                        let maskGeoJSON = turf.mask(matchedFeature); 
+                        maskLayer = L.geoJSON(maskGeoJSON, {
+                            style: { fillColor: '#000000', fillOpacity: parseFloat(maskingVal), weight: 0, color: 'transparent' },
+                            interactive: false
+                        }).addTo(map);
+                    } catch(e){}
+                }
+            }
+
+            // 2. Tampilkan Layer Desa (Poligon Utama) di atas Masking
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
                     let des = p.WADMKD || p.wadmkd || '';
-                    let isMatch = (des === selectedDesa);
-                    if (isMatch) matchedFeature = f;
-                    return isMatch;
+                    return des === selectedDesa;
                 },
                 style: { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal },
                 onEachFeature: function(feature, layer) {
@@ -507,25 +548,12 @@
                 }
             }).addTo(map);
 
-            // Tampilkan kembali di Peta Inset (Mini-map) agar area desa tetap kelihatan di pojok
+            // Tampilkan di Peta Inset (Mini-map)
             if (matchedFeature) {
                 miniMapLayer = L.geoJSON(matchedFeature, {
                     style: { color: '#e74c3c', weight: 1.5, fillColor: '#e74c3c', fillOpacity: 0.8 }
                 }).addTo(miniMap);
                 miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
-            }
-
-            // Masking Penggelapan Luar Wilayah
-            if (maskingVal !== "tidak" && matchedFeature) {
-                try {
-                    let maskGeoJSON = turf.mask(matchedFeature); 
-                    maskLayer = L.geoJSON(maskGeoJSON, {
-                        style: { fillColor: '#000000', fillOpacity: parseFloat(maskingVal), weight: 0, color: 'transparent' },
-                        interactive: false
-                    }).addTo(map);
-                    maskLayer.bringToBack(); 
-                    layerDesa.bringToFront(); 
-                } catch(e){}
             }
 
             if (layerDesa.getLayers().length > 0) {
@@ -549,20 +577,6 @@
                 updateMapDisplay();
                 updateLegendDisplay(); 
             });
-        });
-
-        // --- BASES & EKSPOR ---
-        const basemaps = {
-            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
-            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, crossOrigin: true }),
-            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, crossOrigin: true }),
-            dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
-            positron: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true })
-        };
-        let currentBasemap = basemaps.osm.addTo(map);
-        document.getElementById('select-basemap').addEventListener('change', function() {
-            map.removeLayer(currentBasemap);
-            currentBasemap = (basemaps[this.value] || basemaps.osm).addTo(map);
         });
 
         let customMarkers = [], markerIdCounter = 0, isAddingMarker = false;
