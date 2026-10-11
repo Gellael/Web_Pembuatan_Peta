@@ -44,6 +44,9 @@
         .map-frame-wrapper { grid-row: 2 / 3; grid-column: 1 / 2; position: relative; background: #fff; border-right: 2px solid #000000; box-sizing: border-box; padding: 35px; }
         #map { width: 100%; height: 100%; border: 1.5px solid #000000; box-sizing: border-box; background: #fff; }
 
+        /* Styling Angka Graticule Koordinat agar Terlihat Jelas di Tepi Peta */
+        .leaflet-container .leaflet-grat-label { font-size: 8px !important; color: #000000 !important; background: rgba(255,255,255,0.8); padding: 1px 3px; border-radius: 2px; font-family: 'Courier New', Courier, monospace; font-weight: bold; }
+
         /* Border Zebra Hitam-Putih */
         .border-zebra-top, .border-zebra-bottom { position: absolute; left: 35px; right: 35px; height: 5px; background: repeating-linear-gradient(90deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
         .border-zebra-top { top: 30px; } .border-zebra-bottom { bottom: 30px; }
@@ -229,7 +232,7 @@
             <div class="form-group" style="margin-top: 6px;">
                 <label>Skala Peta</label>
                 <select id="select-skala-mode">
-                    <option value="otomatis" selected>Dinamis Otomatis (Zoom)</option>
+                    <option value="otomatis" selected>Dinamis Otomatis (Mengikuti Zoom)</option>
                     <option value="10000">1 : 10.000</option>
                     <option value="25000">1 : 25.000</option>
                     <option value="50000">1 : 50.000</option>
@@ -376,7 +379,6 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        // --- AKTIFKAN SELECT2 DENGAN BENAR ---
         $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
         });
 
@@ -397,7 +399,7 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten ketika Provinsi dipilih
+        // 2. Load Kabupaten
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; 
@@ -419,17 +421,11 @@
                     selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
                     kabupatens.forEach(kab => selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`);
                     selectKabupaten.disabled = false;
-                    
-                    // SANGAT PENTING: Refresh Select2 agar elemen aktif dan bisa diklik
-                    $('#select-kabupaten').trigger('change.select2');
-                })
-                .catch(err => {
-                    selectKabupaten.innerHTML = '<option value="">-- Gagal Memuat --</option>';
                     $('#select-kabupaten').trigger('change.select2');
                 });
         });
 
-        // 3. Load Desa ketika Kabupaten dipilih
+        // 3. Load Desa
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             selectDesa.innerHTML = '<option value="">-- Memuat Data... --</option>';
@@ -438,10 +434,7 @@
             msgLoading.style.display = 'block';
             desaData = null;
 
-            if (!kab) { 
-                msgLoading.style.display = 'none'; 
-                return; 
-            }
+            if (!kab) { msgLoading.style.display = 'none'; return; }
 
             fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
                 .then(res => res.json())
@@ -458,17 +451,8 @@
                     Array.from(desaSet).sort().forEach(desa => { 
                         selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`; 
                     });
-                    
                     selectDesa.disabled = false; 
-                    
-                    // SANGAT PENTING: Refresh Select2 agar elemen aktif dan bisa diklik
                     $('#select-desa').trigger('change.select2'); 
-                    msgLoading.style.display = 'none';
-                })
-                .catch(err => {
-                    msgLoading.innerText = 'Gagal memuat desa.';
-                    selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>';
-                    $('#select-desa').trigger('change.select2');
                     msgLoading.style.display = 'none';
                 });
         });
@@ -481,7 +465,7 @@
             dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}`;
         }
 
-        // --- FUNGSI GRID KOORDINAT & BORDER ---
+        // --- FUNGSI GRID KOORDINAT & ANGKA DI TEPI PETA ---
         function updateGraticuleAndBorder() {
             if (graticuleLayer) map.removeLayer(graticuleLayer);
             let borderStyle = document.getElementById('select-border').value;
@@ -494,12 +478,12 @@
 
             if (borderStyle === 'standar' || borderStyle === 'grid-saja') {
                 graticuleLayer = L.latLngGraticule({
-                    showLabel: borderStyle === 'standar',
+                    showLabel: true, // Pastikan selalu true agar angka koordinat muncul di tepi peta
                     color: gridColor,
                     weight: 0.6,
                     dashArray: [4, 4],
-                    font: '8px Courier New',
-                    zoomInterval: [ {start: 1, end: 18, interval: 0.05} ]
+                    font: '9px Courier New',
+                    zoomInterval: [ {start: 1, end: 18, interval: 0.02} ]
                 }).addTo(map);
             }
         }
@@ -584,17 +568,23 @@
                 miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
             }
 
-            if (layerDesa.getLayers().length > 0) {
-                map.fitBounds(layerDesa.getBounds());
-            }
-
-            // Atur Skala Peta
+            // Pengaturan Fitur Skala Peta (Manual vs Otomatis)
             if (skalaMode === 'otomatis') {
+                if (layerDesa.getLayers().length > 0) {
+                    map.fitBounds(layerDesa.getBounds());
+                }
                 let currentZoom = map.getZoom();
                 let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
                 document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
             } else {
-                document.getElementById('display-skala').innerText = `1 : ${parseInt(skalaMode).toLocaleString('id-ID')}`;
+                // Jika user memilih skala manual (misal 1:10000, 1:50000), sesuaikan tingkat zoom peta secara otomatis!
+                let targetScale = parseInt(skalaMode);
+                let targetZoom = Math.round(Math.log(50000000 / targetScale) / Math.LN2);
+                if (matchedFeature) {
+                    let center = turf.center(matchedFeature).geometry.coordinates;
+                    map.setView([center[1], center[0]], targetZoom);
+                }
+                document.getElementById('display-skala').innerText = `1 : ${targetScale.toLocaleString('id-ID')}`;
             }
 
             updateGraticuleAndBorder();
@@ -611,7 +601,12 @@
             }
         });
 
-        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color', 'select-skala-mode'].forEach(id => {
+        // Event listener ketika pilihan skala manual diubah dari sidebar
+        document.getElementById('select-skala-mode').addEventListener('change', function() {
+            updateMapDisplay();
+        });
+
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
                 updateMapDisplay();
                 updateLegendDisplay(); 
