@@ -226,13 +226,15 @@
                     </select>
                 </div>
             </div>
+            
+            <!-- SKALA PETA -->
             <div class="form-group" style="margin-top: 6px;">
                 <label>Skala Peta</label>
                 <select id="select-skala-mode">
-                    <option value="otomatis">Dinamis Otomatis</option>
+                    <option value="otomatis" selected>Dinamis Otomatis</option>
                     <option value="1:10000">1 : 10.000</option>
                     <option value="1:25000">1 : 25.000</option>
-                    <option value="1:50000" selected>1 : 50.000</option>
+                    <option value="1:50000">1 : 50.000</option>
                     <option value="1:100000">1 : 100.000</option>
                 </select>
             </div>
@@ -255,17 +257,17 @@
                         <input type="color" id="input-marker-color" value="#e74c3c" style="height: 24px; cursor: pointer; padding:0;">
                     </div>
                 </div>
-                <button class="btn-action btn-marker" onclick="toggleMarkerMode()">Klik Peta untuk Taruh Pin</button>
+                <button class="btn-action btn-marker" onclick="toggleMarkerMode()">📍 Klik Peta untuk Taruh Pin</button>
             </div>
             <div class="form-group" style="margin-top: 8px;">
                 <input type="file" id="input-annot-img" accept="image/*" style="margin-bottom: 4px;">
                 <input type="text" id="input-annot-text" placeholder="Keterangan Gambar Callout" style="margin-bottom: 4px;">
-                <button class="btn-action btn-annot" onclick="toggleAnnotationMode()">Klik Peta untuk Gambar</button>
+                <button class="btn-action btn-annot" onclick="toggleAnnotationMode()">🖼️ Klik Peta untuk Gambar</button>
             </div>
         </div>
 
-        <button class="btn-action btn-png" onclick="exportToPNG()">Download Kanvas Peta (PNG)</button>
-        <button class="btn-action btn-pdf" onclick="exportToPDF()">Cetak / Ekspor PDF</button>
+        <button class="btn-action btn-png" onclick="exportToPNG()">📥 Download Kanvas Peta (PNG)</button>
+        <button class="btn-action btn-pdf" onclick="exportToPDF()">🖨️ Cetak / Ekspor PDF</button>
         <br><br>
     </div>
 
@@ -292,7 +294,8 @@
                 </div>
                 <div class="map-element">
                     <h4>SKALA PETA</h4>
-                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">1 : 50.000</div>
+                    <!-- TEKS SKALA DINAMIS -->
+                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">Memuat Skala...</div>
                 </div>
                 <div class="map-element">
                     <h4>KETERANGAN</h4>
@@ -349,7 +352,7 @@
             terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, crossOrigin: true }),
             humanitarian: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true })
         };
-        let currentBasemap = basemaps.satellite.addTo(map); // Default set ke Satelit
+        let currentBasemap = basemaps.satellite.addTo(map);
 
         document.getElementById('select-basemap').addEventListener('change', function() {
             if (currentBasemap) map.removeLayer(currentBasemap);
@@ -359,7 +362,7 @@
             if (labelLayer) labelLayer.bringToFront();
         });
 
-        // --- INISIALISASI PETA INSET (MINI-MAP) ---
+        // --- INISIALISASI PETA INSET ---
         var miniMap = L.map('mini-map-box', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([-0.7893, 113.9213], 4);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10 }).addTo(miniMap);
         let miniMapLayer = null;
@@ -380,12 +383,11 @@
         const dynamicLegend = document.getElementById('dynamic-legend');
 
         $(document).ready(function() {
-            $('.select2-enable').select2({ width: '100\%' });$('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
+            $('.select2-enable').select2({ width: '100%' });$('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
             $('#select-kabupaten').on('select2:select', function () { selectKabupaten.dispatchEvent(new Event('change')); });
             $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
         });
 
-        // 1. Load Provinsi
         fetch('/api/get-wilayah')
             .then(res => { if(!res.ok) throw new Error("API Timeout"); return res.json(); })
             .then(provinces => {
@@ -402,7 +404,6 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
@@ -422,7 +423,6 @@
                 });
         });
 
-        // 3. Load Desa
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             selectDesa.innerHTML = '<option value="">-- Memuat Data... --</option>';
@@ -453,7 +453,6 @@
             dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}`;
         }
 
-        // --- FUNGSI GRID KOORDINAT & BORDER ---
         function updateGraticuleAndBorder() {
             if (graticuleLayer) map.removeLayer(graticuleLayer);
             let borderStyle = document.getElementById('select-border').value;
@@ -476,7 +475,25 @@
             }
         }
 
-        // 4. Update Tampilan Peta Utama & Peta Inset
+        // --- FUNGSI UPDATE TEKS SKALA MATEMATIS ---
+        function updateScaleDisplay() {
+            let skalaMode = document.getElementById('select-skala-mode').value;
+            let displaySkala = document.getElementById('display-skala');
+            
+            if (skalaMode === 'otomatis') {
+                // Rumus Resolusi Mercator vs DPI Layar
+                let lat = map.getCenter().lat;
+                let dpi = 96; 
+                let resolution = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+                let currentScale = Math.round(resolution * (dpi / 0.0254));
+                displaySkala.innerText = `1 : ${currentScale.toLocaleString('id-ID').replace(/,/g, '.')}`; 
+            } else {
+                let targetScale = parseInt(skalaMode.split(':')[1]);
+                displaySkala.innerText = `1 : ${targetScale.toLocaleString('id-ID').replace(/,/g, '.')}`;
+            }
+        }
+
+        // --- FUNGSI UPDATE PETA ---
         function updateMapDisplay() {
             let selectedDesa = selectDesa.value;
             if (!desaData || !desaData.features || !selectedDesa) return;
@@ -501,9 +518,7 @@
 
             let matchedFeature = null;
 
-            // 1. Tampilkan Masking (Penggelapan Luar) terlebih dahulu agar berada tepat di atas Basemap
             if (maskingVal !== "tidak") {
-                // Cari feature desa yang dipilih untuk dilubangi
                 desaData.features.forEach(f => {
                     let des = f.properties.WADMKD || f.properties.wadmkd || '';
                     if (des === selectedDesa) matchedFeature = f;
@@ -520,7 +535,6 @@
                 }
             }
 
-            // 2. Tampilkan Layer Desa (Poligon Utama) di atas Masking
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
@@ -548,7 +562,6 @@
                 }
             }).addTo(map);
 
-            // Tampilkan di Peta Inset (Mini-map)
             if (matchedFeature) {
                 miniMapLayer = L.geoJSON(matchedFeature, {
                     style: { color: '#e74c3c', weight: 1.5, fillColor: '#e74c3c', fillOpacity: 0.8 }
@@ -556,27 +569,56 @@
                 miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
             }
 
+            // ATUR ZOOM MAP & UPDATE SKALA SECARA BERGANTIAN
             if (layerDesa.getLayers().length > 0) {
                 map.fitBounds(layerDesa.getBounds());
-            }
-
-            // Atur Skala Peta
-            if (skalaMode === 'otomatis') {
-                document.getElementById('display-skala').innerText = `Zoom Level ${map.getZoom()}`;
+                
+                // Jeda 100ms agar fitBounds selesai, lalu atur zoom ke skala fixed jika dipilih
+                setTimeout(() => {
+                    if (skalaMode !== 'otomatis') {
+                        let targetScale = parseInt(skalaMode.split(':')[1]);
+                        let lat = map.getCenter().lat;
+                        let targetResolution = targetScale / (96 / 0.0254);
+                        let zoom = Math.log2((156543.03392 * Math.cos(lat * Math.PI / 180)) / targetResolution);
+                        map.setZoom(Math.round(zoom));
+                    }
+                    updateScaleDisplay();
+                }, 100);
             } else {
-                document.getElementById('display-skala').innerText = skalaMode;
+                updateScaleDisplay();
             }
 
             updateGraticuleAndBorder();
         }
 
+        // EVENT LISTENER
         selectDesa.addEventListener('change', updateMapDisplay);
         
-        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color', 'select-skala-mode'].forEach(id => {
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
                 updateMapDisplay();
                 updateLegendDisplay(); 
             });
+        });
+
+        // Event Listener Khusus Skala Peta
+        document.getElementById('select-skala-mode').addEventListener('change', function() {
+            let val = this.value;
+            if (val !== 'otomatis') {
+                let targetScale = parseInt(val.split(':')[1]);
+                let lat = map.getCenter().lat;
+                let targetResolution = targetScale / (96 / 0.0254);
+                let zoom = Math.log2((156543.03392 * Math.cos(lat * Math.PI / 180)) / targetResolution);
+                map.setZoom(Math.round(zoom)); // Otomatis zoom ke ketinggian skala tsb
+            }
+            updateScaleDisplay();
+        });
+
+        // Update teks skala secara dinamis saat peta di-zoom/scroll oleh mouse pengguna
+        map.on('zoomend moveend', function() {
+            if (document.getElementById('select-skala-mode').value === 'otomatis') {
+                updateScaleDisplay();
+            }
         });
 
         let customMarkers = [], markerIdCounter = 0, isAddingMarker = false;
