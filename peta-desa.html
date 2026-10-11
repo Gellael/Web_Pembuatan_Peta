@@ -181,7 +181,7 @@
                 <select id="select-masking">
                     <option value="tidak">Tanpa Efek (Normal)</option>
                     <option value="0.3">Gelap Tipis (30%)</option>
-                    <option value="0.5" selected>Gelap Sedang (50%)</option>
+                    <option value="0.5">Gelap Sedang (50%)</option>
                     <option value="0.75">Gelap Pekat (75%)</option>
                 </select>
             </div>
@@ -229,11 +229,11 @@
             <div class="form-group" style="margin-top: 6px;">
                 <label>Skala Peta</label>
                 <select id="select-skala-mode">
-                    <option value="otomatis">Dinamis Otomatis</option>
-                    <option value="1:10000">1 : 10.000</option>
-                    <option value="1:25000">1 : 25.000</option>
-                    <option value="1:50000" selected>1 : 50.000</option>
-                    <option value="1:100000">1 : 100.000</option>
+                    <option value="otomatis" selected>Dinamis Otomatis (Zoom)</option>
+                    <option value="10000">1 : 10.000</option>
+                    <option value="25000">1 : 25.000</option>
+                    <option value="50000">1 : 50.000</option>
+                    <option value="100000">1 : 100.000</option>
                 </select>
             </div>
         </div>
@@ -349,14 +349,11 @@
             terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, crossOrigin: true }),
             humanitarian: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true })
         };
-        let currentBasemap = basemaps.satellite.addTo(map); // Default set ke Satelit
+        let currentBasemap = basemaps.satellite.addTo(map);
 
         document.getElementById('select-basemap').addEventListener('change', function() {
             if (currentBasemap) map.removeLayer(currentBasemap);
             currentBasemap = (basemaps[this.value] || basemaps.osm).addTo(map);
-            if (maskLayer) maskLayer.bringToFront();
-            if (layerDesa) layerDesa.bringToFront();
-            if (labelLayer) labelLayer.bringToFront();
         });
 
         // --- INISIALISASI PETA INSET (MINI-MAP) ---
@@ -379,10 +376,8 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        $(document).ready(function() {
-            $('.select2-enable').select2({ width: '100\%' });$('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
-            $('#select-kabupaten').on('select2:select', function () { selectKabupaten.dispatchEvent(new Event('change')); });
-            $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
+        // --- AKTIFKAN SELECT2 DENGAN BENAR ---
+        $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
         });
 
         // 1. Load Provinsi
@@ -402,12 +397,18 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten
+        // 2. Load Kabupaten ketika Provinsi dipilih
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
-            selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
-            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Dahulu --</option>'; selectDesa.disabled = true;
-            if (!prov) { $('#select-kabupaten').trigger('change.select2'); $('#select-desa').trigger('change.select2'); return; }
+            selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; 
+            selectKabupaten.disabled = true;
+            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Dahulu --</option>'; 
+            selectDesa.disabled = true;
+            
+            $('#select-kabupaten').trigger('change.select2');
+            $('#select-desa').trigger('change.select2');
+
+            if (!prov) return;
 
             selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
             $('#select-kabupaten').trigger('change.select2');
@@ -418,11 +419,17 @@
                     selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>';
                     kabupatens.forEach(kab => selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`);
                     selectKabupaten.disabled = false;
-                    $('#select-kabupaten').trigger('change.select2'); $('#select-desa').trigger('change.select2');
+                    
+                    // SANGAT PENTING: Refresh Select2 agar elemen aktif dan bisa diklik
+                    $('#select-kabupaten').trigger('change.select2');
+                })
+                .catch(err => {
+                    selectKabupaten.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                    $('#select-kabupaten').trigger('change.select2');
                 });
         });
 
-        // 3. Load Desa
+        // 3. Load Desa ketika Kabupaten dipilih
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
             selectDesa.innerHTML = '<option value="">-- Memuat Data... --</option>';
@@ -431,7 +438,10 @@
             msgLoading.style.display = 'block';
             desaData = null;
 
-            if (!kab) { msgLoading.style.display = 'none'; return; }
+            if (!kab) { 
+                msgLoading.style.display = 'none'; 
+                return; 
+            }
 
             fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
                 .then(res => res.json())
@@ -439,9 +449,27 @@
                     desaData = data;
                     selectDesa.innerHTML = '<option value="">-- Cari / Pilih Desa --</option>';
                     let desaSet = new Set();
-                    if (data && data.features) { data.features.forEach(f => { let namaDesa = f.properties.WADMKD || f.properties.wadmkd; if (namaDesa) desaSet.add(namaDesa); }); }
-                    Array.from(desaSet).sort().forEach(desa => { selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`; });
-                    selectDesa.disabled = false; $('#select-desa').trigger('change.select2'); msgLoading.style.display = 'none';
+                    if (data && data.features) { 
+                        data.features.forEach(f => { 
+                            let namaDesa = f.properties.WADMKD || f.properties.wadmkd; 
+                            if (namaDesa) desaSet.add(namaDesa); 
+                        }); 
+                    }
+                    Array.from(desaSet).sort().forEach(desa => { 
+                        selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`; 
+                    });
+                    
+                    selectDesa.disabled = false; 
+                    
+                    // SANGAT PENTING: Refresh Select2 agar elemen aktif dan bisa diklik
+                    $('#select-desa').trigger('change.select2'); 
+                    msgLoading.style.display = 'none';
+                })
+                .catch(err => {
+                    msgLoading.innerText = 'Gagal memuat desa.';
+                    selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                    $('#select-desa').trigger('change.select2');
+                    msgLoading.style.display = 'none';
                 });
         });
 
@@ -501,26 +529,26 @@
 
             let matchedFeature = null;
 
-            // 1. Tampilkan Masking (Penggelapan Luar) terlebih dahulu agar berada tepat di atas Basemap
-            if (maskingVal !== "tidak") {
-                // Cari feature desa yang dipilih untuk dilubangi
-                desaData.features.forEach(f => {
-                    let des = f.properties.WADMKD || f.properties.wadmkd || '';
-                    if (des === selectedDesa) matchedFeature = f;
-                });
+            desaData.features.forEach(f => {
+                let des = f.properties.WADMKD || f.properties.wadmkd || '';
+                if (des === selectedDesa) matchedFeature = f;
+            });
 
-                if (matchedFeature) {
-                    try {
-                        let maskGeoJSON = turf.mask(matchedFeature); 
+            // Masking Luar Wilayah
+            if (maskingVal !== "tidak" && matchedFeature) {
+                try {
+                    let worldBox = turf.polygon([[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]);
+                    let maskGeoJSON = turf.difference(worldBox, matchedFeature);
+                    if (maskGeoJSON) {
                         maskLayer = L.geoJSON(maskGeoJSON, {
                             style: { fillColor: '#000000', fillOpacity: parseFloat(maskingVal), weight: 0, color: 'transparent' },
                             interactive: false
                         }).addTo(map);
-                    } catch(e){}
-                }
+                    }
+                } catch(e) {}
             }
 
-            // 2. Tampilkan Layer Desa (Poligon Utama) di atas Masking
+            // Layer Poligon Desa Utama
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
@@ -562,9 +590,11 @@
 
             // Atur Skala Peta
             if (skalaMode === 'otomatis') {
-                document.getElementById('display-skala').innerText = `Zoom Level ${map.getZoom()}`;
+                let currentZoom = map.getZoom();
+                let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
+                document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
             } else {
-                document.getElementById('display-skala').innerText = skalaMode;
+                document.getElementById('display-skala').innerText = `1 : ${parseInt(skalaMode).toLocaleString('id-ID')}`;
             }
 
             updateGraticuleAndBorder();
@@ -572,6 +602,15 @@
 
         selectDesa.addEventListener('change', updateMapDisplay);
         
+        map.on('zoomend', function() {
+            let skalaMode = document.getElementById('select-skala-mode').value;
+            if (skalaMode === 'otomatis') {
+                let currentZoom = map.getZoom();
+                let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
+                document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
+            }
+        });
+
         ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color', 'select-skala-mode'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
                 updateMapDisplay();
