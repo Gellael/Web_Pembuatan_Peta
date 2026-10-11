@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Peta Administrasi - GeoLayout Pro</title>
+    
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Select2 CSS untuk Fitur Search & Scroll di Dropdown -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
     <style>
         :root { --primary: #2c3e50; --accent: #2980b9; --bg-dark: #2f3640; --sidebar-bg: #f5f6fa; --border-color: #dcdde1; }
         body { margin: 0; padding: 0; display: flex; height: 100vh; font-family: Arial, Helvetica, sans-serif; background-color: var(--bg-dark); overflow: hidden; }
@@ -22,9 +27,13 @@
         .form-group { margin-bottom: 8px; }
         .form-group:last-child { margin-bottom: 0; }
         .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
-        .form-group select, .form-group input { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
-        .form-group select:focus, .form-group input:focus { border-color: var(--accent); outline: none; }
-        select.loading, input.loading { background-color: #f0f0f0; color: #888; font-style: italic; }
+        .form-group select, .form-group input[type="text"], .form-group input[type="file"] { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
+        
+        /* Modifikasi Tema Select2 agar pas dengan desain existing */
+        .select2-container--default .select2-selection--single { border: 1px solid #ccc; border-radius: 4px; height: 28px; background-color: #fff; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 26px; font-size: 11px; color: #333; padding-left: 6px; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 26px; }
+        .select2-dropdown { font-size: 11px; }
 
         /* Area Kanvas Peta Cetak ala QGIS Layout */
         #map-container { flex-grow: 1; height: 100%; padding: 20px; box-sizing: border-box; display: flex; justify-content: center; align-items: center; background: #1e272e; overflow: auto; }
@@ -81,21 +90,22 @@
         <a href="index.html" class="back-link">← Kembali ke Dashboard</a>
         <h2 class="brand-title">🗺️ Pembuat Peta Administrasi</h2>
         
-        <!-- STEP 1: LOKASI PETA -->
+        <!-- STEP 1: LOKASI PETA DENGAN FITUR PENCARIAN & SCROLL -->
         <div class="control-card">
             <h3 class="card-step-title">1. Lokasi Pemetaan</h3>
             <div class="form-group">
                 <label>Provinsi</label>
-                <select id="select-provinsi"><option value="">-- Pilih Provinsi --</option></select>
+                <select id="select-provinsi" class="select2-enable"><option value="">-- Pilih Provinsi --</option></select>
             </div>
             <div class="form-group">
                 <label>Kabupaten/Kota</label>
-                <select id="select-kabupaten" disabled><option value="">-- Pilih Provinsi Dahulu --</option></select>
+                <select id="select-kabupaten" class="select2-enable" disabled><option value="">-- Pilih Provinsi Dahulu --</option></select>
             </div>
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
-                <label style="color: #d35400;">📍 Kelurahan / Desa (Bisa Ketik/Cari)</label>
-                <input type="text" id="input-search-desa" list="list-desa" placeholder="Ketik nama desa..." class="loading" disabled autocomplete="off">
-                <datalist id="list-desa"></datalist>
+                <label style="color: #d35400;">📍 Kelurahan / Desa (Cari & Pilih)</label>
+                <select id="select-desa" class="select2-enable" disabled>
+                    <option value="">-- Pilih Kabupaten Dahulu --</option>
+                </select>
                 <small id="desa-loading-msg" style="color: #e74c3c; font-size: 8px; display: none; margin-top: 4px;">Sedang memuat data dari database...</small>
             </div>
         </div>
@@ -110,18 +120,10 @@
         <!-- STEP 3: SIMBOLOGI & BATAS WILAYAH -->
         <div class="control-card">
             <h3 class="card-step-title">3. Simbologi & Batas Wilayah</h3>
-            <div class="form-group">
-                <label>Tipe Simbologi Warna</label>
-                <select id="select-symbology">
-                    <option value="single">Satu Warna Seragam</option>
-                    <option value="categorized" selected>Kategori Warna-Warni Poligon</option>
-                </select>
-            </div>
-            
             <div style="display: flex; gap: 5px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Warna Utama</label>
-                    <input type="color" id="input-fill-color" value="#3498db" style="height: 30px; cursor: pointer;">
+                    <input type="color" id="input-fill-color" value="#3498db" style="height: 30px; cursor: pointer; padding: 0;">
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label>Transparansi</label>
@@ -135,13 +137,6 @@
             </div>
 
             <div style="display: flex; gap: 5px; margin-top: 6px;">
-                <div class="form-group" style="flex: 1;">
-                    <label>Tampil Batas</label>
-                    <select id="select-show-kab">
-                        <option value="ya">Ya</option>
-                        <option value="tidak">Tidak</option>
-                    </select>
-                </div>
                 <div class="form-group" style="flex: 1;">
                     <label>Gaya Batas</label>
                     <select id="select-dash">
@@ -327,14 +322,16 @@
         </div>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Script Wajib Leaflet & Ekspor -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-latlng-graticule@1.2.0/L.latLngGraticule.js"></script>
-    <!-- Turf.js -->
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <!-- html2canvas & jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Script jQuery & Select2 (Untuk Fitur Search & Scroll) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
         document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
@@ -349,11 +346,19 @@
 
         const selectProvinsi = document.getElementById('select-provinsi');
         const selectKabupaten = document.getElementById('select-kabupaten');
-        const inputSearchDesa = document.getElementById('input-search-desa');
-        const listDesa = document.getElementById('list-desa');
+        const selectDesa = document.getElementById('select-desa');
         const msgLoading = document.getElementById('desa-loading-msg');
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
+
+        // --- AKTIFKAN FITUR SELECT2 PADA DROPDOWN ---
+        $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
+
+            // Menghubungkan Select2 dengan Event Listener Vanilla JS
+            $('#select-provinsi').on('select2:select', function () { selectProvinsi.dispatchEvent(new Event('change')); });
+            $('#select-kabupaten').on('select2:select', function () { selectKabupaten.dispatchEvent(new Event('change')); });
+            $('#select-desa').on('select2:select', function () { selectDesa.dispatchEvent(new Event('change')); });
+        });
 
         // 1. Load Provinsi dari JSON lokal
         fetch('data/38 Provinsi Indonesia - Kabupaten.json')
@@ -363,42 +368,53 @@
                 let provinces = [...new Set(data.features.map(f => f.properties.WADMPR).filter(p => p != null))].sort();
                 selectProvinsi.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
                 provinces.forEach(prov => {
-                    let opt = document.createElement('option'); opt.value = prov; opt.textContent = prov; selectProvinsi.appendChild(opt);
+                    selectProvinsi.innerHTML += `<option value="${prov}">${prov}</option>`;
                 });
+                $('#select-provinsi').trigger('change.select2'); // Update UI Select2
             });
 
+        // 2. Load Kabupaten ketika Provinsi dipilih
         selectProvinsi.addEventListener('change', function() {
             let prov = this.value;
             selectKabupaten.innerHTML = '<option value="">-- Pilih Kabupaten --</option>'; selectKabupaten.disabled = true;
-            inputSearchDesa.value = ''; inputSearchDesa.disabled = true; inputSearchDesa.classList.add('loading');
+            selectDesa.innerHTML = '<option value="">-- Pilih Kabupaten Dahulu --</option>'; selectDesa.disabled = true;
             
-            if (!prov || !kabupatenData) return;
+            if (!prov || !kabupatenData) {
+                $('#select-kabupaten').trigger('change.select2');
+                $('#select-desa').trigger('change.select2');
+                return;
+            }
 
             let kabSet = new Set();
             kabupatenData.features.forEach(f => { if (f.properties.WADMPR === prov && f.properties.WADMKK) kabSet.add(f.properties.WADMKK); });
             Array.from(kabSet).sort().forEach(kab => {
-                let opt = document.createElement('option'); opt.value = kab; opt.textContent = kab; selectKabupaten.appendChild(opt);
+                selectKabupaten.innerHTML += `<option value="${kab}">${kab}</option>`;
             });
             selectKabupaten.disabled = false;
+            $('#select-kabupaten').trigger('change.select2'); // Update UI Select2
+            $('#select-desa').trigger('change.select2');
         });
 
-        // 2. Ketika Kabupaten dipilih, ambil data desa dari API
+        // 3. Load Desa dari database ketika Kabupaten dipilih
         selectKabupaten.addEventListener('change', function() {
             let kab = this.value;
-            inputSearchDesa.value = '';
-            inputSearchDesa.disabled = true;
-            inputSearchDesa.classList.add('loading');
+            selectDesa.innerHTML = '<option value="">-- Memuat Data... --</option>';
+            selectDesa.disabled = true;
+            $('#select-desa').trigger('change.select2'); // Kunci sementara
+            
             msgLoading.style.display = 'block';
-            msgLoading.innerText = 'Memuat desa dari database...';
             desaData = null;
 
-            if (!kab) return;
+            if (!kab) {
+                msgLoading.style.display = 'none';
+                return;
+            }
 
             fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
                 .then(res => res.json())
                 .then(data => {
                     desaData = data;
-                    listDesa.innerHTML = '';
+                    selectDesa.innerHTML = '<option value="">-- Cari / Pilih Desa --</option>';
                     let desaSet = new Set();
                     if (data && data.features) {
                         data.features.forEach(f => {
@@ -407,22 +423,23 @@
                         });
                     }
                     Array.from(desaSet).sort().forEach(desa => {
-                        let opt = document.createElement('option');
-                        opt.value = desa;
-                        listDesa.appendChild(opt);
+                        selectDesa.innerHTML += `<option value="${desa}">${desa}</option>`;
                     });
-                    inputSearchDesa.classList.remove('loading');
-                    inputSearchDesa.disabled = false;
+                    
+                    selectDesa.disabled = false;
+                    $('#select-desa').trigger('change.select2'); // Perbarui UI dengan List Baru
                     msgLoading.style.display = 'none';
                 })
                 .catch(err => {
                     msgLoading.innerText = 'Gagal memuat desa.';
+                    selectDesa.innerHTML = '<option value="">-- Gagal Memuat --</option>';
+                    $('#select-desa').trigger('change.select2');
                 });
         });
 
-        // 3. Ketik atau Pilih Desa untuk ditampilkan di peta
-        inputSearchDesa.addEventListener('input', function() {
-            let selectedDesa = this.value.trim();
+        // 4. Update Tampilan Peta saat Desa Dipilih / Warna Diubah
+        function updateMapDisplay() {
+            let selectedDesa = selectDesa.value;
             if (!desaData || !desaData.features || !selectedDesa) return;
 
             if (layerDesa) map.removeLayer(layerDesa);
@@ -431,15 +448,17 @@
             let fillColor = document.getElementById('input-fill-color').value;
             let opacityVal = parseFloat(document.getElementById('select-opacity').value);
             let weightVal = parseFloat(document.getElementById('select-weight').value);
+            let dashVal = document.getElementById('select-dash').value;
             let showLabels = document.getElementById('select-show-label').value === 'ya';
 
+            // Filter akurat karena nilai didapat langsung dari opsi Select2
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
                     let des = p.WADMKD || p.wadmkd || '';
-                    return des.toLowerCase() === selectedDesa.toLowerCase();
+                    return des === selectedDesa;
                 },
-                style: { color: "#2c3e50", weight: weightVal, fillColor: fillColor, fillOpacity: opacityVal },
+                style: { color: "#2c3e50", weight: weightVal, dashArray: dashVal, fillColor: fillColor, fillOpacity: opacityVal },
                 onEachFeature: function(feature, layer) {
                     let p = feature.properties;
                     let desa = p.WADMKD || p.wadmkd;
@@ -463,6 +482,12 @@
             if (layerDesa.getLayers().length > 0) {
                 map.fitBounds(layerDesa.getBounds());
             }
+        }
+
+        // Jalankan fungsi update peta ketika desa dipilih atau styling diubah
+        selectDesa.addEventListener('change', updateMapDisplay);
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label'].forEach(id => {
+            document.getElementById(id).addEventListener('change', updateMapDisplay);
         });
 
         // --- BASES & EKSPOR ---
