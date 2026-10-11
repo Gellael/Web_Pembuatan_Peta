@@ -42,11 +42,27 @@
         .qgis-header h1 { margin: 0; font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Times New Roman', Times, serif; color: #000; }
         .qgis-header p { margin: 2px 0 0 0; font-size: 10px; color: #444; font-family: Arial, sans-serif; }
         
+        /* Layout Margin Tepi Peta (Padding 35px untuk ruang putih di luar garis hitam) */
         .map-frame-wrapper { grid-row: 2 / 3; grid-column: 1 / 2; position: relative; background: #fff; border-right: 2px solid #000000; box-sizing: border-box; padding: 35px; }
+        
+        /* Map Leaflet berada tepat di dalam garis hitam inner */
         #map { width: 100%; height: 100%; border: 1.5px solid #000000; box-sizing: border-box; background: #fff; z-index: 1; }
 
-        /* Styling Angka Graticule Koordinat di Sekitar Tepi Peta */
-        .leaflet-container .leaflet-grat-label { font-size: 9px !important; color: #000000 !important; background: #ffffff !important; padding: 2px 4px; border: 1px solid #000000; font-family: Arial, Helvetica, sans-serif; font-weight: bold; z-index: 999; border-radius: 2px; }
+        /* Container Absolut Khusus Teks Koordinat Tepi agar STAY stabil */
+        #edge-labels-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 1000; overflow: hidden; }
+        
+        /* Desain Label Koordinat yang terkunci presisi */
+        .coord-label { position: absolute; font-family: 'Times New Roman', Times, serif; font-size: 10px; font-weight: bold; color: #000; white-space: nowrap; }
+
+        /* Kustomisasi Skala Bar Box di dalam peta (Kiri Bawah) */
+        .leaflet-control-scale-line { background: rgba(255, 255, 255, 0.95) !important; border: 1.5px solid #000 !important; border-top: none !important; color: #000 !important; font-weight: bold; font-family: Arial, sans-serif; font-size: 10px; padding: 2px 6px !important; border-radius: 0 !important; box-shadow: none !important; }
+        .leaflet-control-scale-line:not(:first-child) { border-top: 1.5px solid #000 !important; border-bottom: none !important; margin-top: -1.5px; }
+
+        /* Border Zebra Hitam-Putih */
+        .border-zebra-top, .border-zebra-bottom { position: absolute; left: 35px; right: 35px; height: 5px; background: repeating-linear-gradient(90deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
+        .border-zebra-top { top: 30px; } .border-zebra-bottom { bottom: 30px; }
+        .border-zebra-left, .border-zebra-right { position: absolute; top: 35px; bottom: 35px; width: 5px; background: repeating-linear-gradient(0deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
+        .border-zebra-left { left: 30px; } .border-zebra-right { right: 30px; }
 
         .leaflet-control-attribution { display: none !important; }
         .region-label { font-weight: bold; text-align: center; white-space: nowrap; cursor: move; }
@@ -209,31 +225,32 @@
                 <div class="form-group" style="flex: 1;">
                     <label>Bentuk Grid</label>
                     <select id="select-border">
-                        <option value="standar" selected>Standar</option>
+                        <option value="standar" selected>Standar (Garis Putih)</option>
+                        <option value="zebra">Gaya Zebra</option>
                         <option value="tidak">Tanpa Grid</option>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label>Warna Garis Grid</label>
                     <select id="select-grid-color">
-                        <option value="#000000" selected>Hitam</option>
+                        <option value="#ffffff" selected>Putih</option>
+                        <option value="#000000">Hitam</option>
                         <option value="#7f8c8d">Abu-abu</option>
-                        <option value="#ffffff">Putih</option>
                     </select>
                 </div>
             </div>
-            <!-- INPUT SKALA SEPERTI GAMBAR (Dinamis / Kustom Fix) -->
+            <!-- SKALA OTOMATIS DINAMIS SEBAGAI DEFAULT -->
             <div style="display: flex; gap: 5px; margin-top: 6px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Skala Peta</label>
                     <select id="select-skala-mode">
-                        <option value="dinamis">Dinamis</option>
-                        <option value="kustom" selected>Kustom Fix</option>
+                        <option value="dinamis" selected>Dinamis</option>
+                        <option value="kustom">Kustom Fix</option>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label>Target Skala</label>
-                    <input type="number" id="input-target-skala" value="25000">
+                    <input type="number" id="input-target-skala" value="25000" disabled>
                 </div>
             </div>
         </div>
@@ -278,7 +295,16 @@
             </div>
             
             <div class="map-frame-wrapper">
+                <!-- Inner Container Leaflet Map -->
                 <div id="map"></div>
+                
+                <!-- CONTAINER ABSOLUT LABEL KOORDINAT - ANTI LAG/STAY FIX -->
+                <div id="edge-labels-container"></div>
+                
+                <div class="border-zebra-top" id="zebra-t"></div>
+                <div class="border-zebra-bottom" id="zebra-b"></div>
+                <div class="border-zebra-left" id="zebra-l"></div>
+                <div class="border-zebra-right" id="zebra-r"></div>
             </div>
 
             <div class="qgis-side-panel">
@@ -288,7 +314,7 @@
                 </div>
                 <div class="map-element">
                     <h4>SKALA PETA</h4>
-                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">1 : 25.000</div>
+                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">-</div>
                 </div>
                 <div class="map-element">
                     <h4>KETERANGAN</h4>
@@ -330,7 +356,6 @@
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
 
-        // Tambahkan Scale Bar Control otomatis di pojok kiri bawah peta
         L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
 
         // --- BASEMAPS DEFINITION ---
@@ -366,6 +391,23 @@
         let graticuleLayer = null;
         let localDataFallback = null;
 
+        // Master Grid Intervals
+        const gridIntervals = [
+            {start: 2, end: 3, interval: 10},
+            {start: 4, end: 5, interval: 5},
+            {start: 6, end: 7, interval: 2},
+            {start: 8, end: 9, interval: 1},
+            {start: 10, end: 10, interval: 0.5},
+            {start: 11, end: 11, interval: 0.2},
+            {start: 12, end: 13, interval: 0.1},
+            {start: 14, end: 14, interval: 0.05},
+            {start: 15, end: 15, interval: 0.02},
+            {start: 16, end: 16, interval: 0.01},
+            {start: 17, end: 17, interval: 0.005},
+            {start: 18, end: 18, interval: 0.002},
+            {start: 19, end: 20, interval: 0.001}
+        ];
+
         fetch('data/38 Provinsi Indonesia - Kabupaten.json').then(res => res.json()).then(data => localDataFallback = data).catch(e => {});
 
         const selectProvinsi = document.getElementById('select-provinsi');
@@ -375,10 +417,10 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
+        $(document).ready(function() {
+            $('.select2-enable').select2({ width: '100%' });
         });
 
-        // 1. Load Provinsi via AJAX
         fetch('/api/get-wilayah')
             .then(res => { if(!res.ok) throw new Error("API Timeout"); return res.json(); })
             .then(provinces => {
@@ -395,7 +437,6 @@
                 $('#select-provinsi').trigger('change.select2');
             });
 
-        // 2. Load Kabupaten ketika Provinsi dipilih
         $('#select-provinsi').on('select2:select', function (e) {
             let prov = e.params.data.id;
             selectKabupaten.innerHTML = '<option value="">-- Memuat Kabupaten... --</option>';
@@ -418,7 +459,6 @@
                 });
         });
 
-        // 3. Load Desa ketika Kabupaten dipilih dan sinkronkan nilainya
         $('#select-kabupaten').on('select2:select', function (e) {
             let kab = e.params.data.id;
             selectDesa.innerHTML = '<option value="">-- Memuat Data Desa... --</option>';
@@ -459,7 +499,6 @@
                 });
         });
 
-        // 4. Tangkap event pemilihan desa dengan Select2 secara akurat
         $('#select-desa').on('select2:select', function (e) {
             selectDesa.value = e.params.data.id;
             updateMapDisplay();
@@ -473,46 +512,161 @@
             dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}`;
         }
 
-        // --- FUNGSI GRID KOORDINAT & ANGKA DI TEPI PETA ---
+        // --- ALGORITMA PERHITUNGAN SKALA DINAMIS ---
+        function getMapScale() {
+            let centerLat = map.getCenter().lat;
+            let currentZoom = map.getZoom();
+            let metersPerPixel = 156543.03392 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, currentZoom);
+            let scaleRatio = metersPerPixel * 3779.527559; 
+            
+            if (scaleRatio > 1000000) return Math.round(scaleRatio / 100000) * 100000;
+            if (scaleRatio > 100000) return Math.round(scaleRatio / 10000) * 10000;
+            if (scaleRatio > 10000) return Math.round(scaleRatio / 1000) * 1000;
+            if (scaleRatio > 1000) return Math.round(scaleRatio / 500) * 500;
+            return Math.round(scaleRatio);
+        }
+
+        // --- SISTEM TEKS KOORDINAT ANTI-LAG (STAY & FIXED) ---
+        function drawEdgeCoordinates() {
+            const container = document.getElementById('edge-labels-container');
+            container.innerHTML = ''; 
+
+            let borderStyle = document.getElementById('select-border').value;
+            if (borderStyle === 'tidak') return;
+
+            let zoom = map.getZoom();
+            let interval = 0.02;
+            for (let i = 0; i < gridIntervals.length; i++) {
+                if (zoom >= gridIntervals[i].start && zoom <= gridIntervals[i].end) {
+                    interval = gridIntervals[i].interval; 
+                    break;
+                }
+            }
+
+            let bounds = map.getBounds();
+            let w = bounds.getWest(), e = bounds.getEast(), n = bounds.getNorth(), s = bounds.getSouth();
+            let mapSize = map.getSize();
+
+            function formatCoord(val, type) {
+                let dir = (type === 'lat') ? (val >= 0 ? 'N' : 'S') : (val >= 0 ? 'E' : 'W');
+                let dec = interval < 0.1 ? (interval < 0.01 ? 3 : 2) : 1; 
+                let fixedVal = Math.abs(val).toFixed(dec);
+                return `${fixedVal}°${dir}`;
+            }
+
+            let eps = interval * 0.1;
+
+            // X-axis (Longitude - Garis Vertikal) Label Atas & Bawah
+            let startLng = Math.ceil(w / interval) * interval;
+            for (let lng = startLng; lng <= e + eps; lng += interval) {
+                let pt = map.latLngToContainerPoint([n, lng]);
+                if (pt.x < 0 || pt.x > mapSize.x) continue;
+                
+                let cx = pt.x + 35; // Tambah padding margin 35px
+                let text = formatCoord(lng, 'lng');
+                
+                let topLbl = document.createElement('div');
+                topLbl.className = 'coord-label';
+                topLbl.innerText = text;
+                topLbl.style.left = cx + 'px';
+                topLbl.style.top = '17px'; 
+                topLbl.style.transform = 'translate(-50%, -50%)';
+                container.appendChild(topLbl);
+                
+                let botLbl = document.createElement('div');
+                botLbl.className = 'coord-label';
+                botLbl.innerText = text;
+                botLbl.style.left = cx + 'px';
+                botLbl.style.bottom = '17px';
+                botLbl.style.transform = 'translate(-50%, 50%)';
+                container.appendChild(botLbl);
+            }
+
+            // Y-axis (Latitude - Garis Horizontal) Label Kiri & Kanan (Diputar 90 deg)
+            let startLat = Math.ceil(s / interval) * interval;
+            for (let lat = startLat; lat <= n + eps; lat += interval) {
+                let pt = map.latLngToContainerPoint([lat, w]);
+                if (pt.y < 0 || pt.y > mapSize.y) continue;
+                
+                let cy = pt.y + 35; // Tambah padding margin 35px
+                let text = formatCoord(lat, 'lat');
+                
+                let leftLbl = document.createElement('div');
+                leftLbl.className = 'coord-label';
+                leftLbl.innerText = text;
+                leftLbl.style.top = cy + 'px';
+                leftLbl.style.left = '17px'; 
+                leftLbl.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
+                container.appendChild(leftLbl);
+                
+                let rightLbl = document.createElement('div');
+                rightLbl.className = 'coord-label';
+                rightLbl.innerText = text;
+                rightLbl.style.top = cy + 'px';
+                rightLbl.style.left = (mapSize.x + 53) + 'px'; // 35px border + margin kanan
+                rightLbl.style.transform = 'translate(-50%, -50%) rotate(90deg)';
+                container.appendChild(rightLbl);
+            }
+        }
+
         function updateGraticuleAndBorder() {
             if (graticuleLayer) map.removeLayer(graticuleLayer);
             let borderStyle = document.getElementById('select-border').value;
             let gridColor = document.getElementById('select-grid-color').value;
 
-            if (borderStyle === 'standar') {
+            document.getElementById('zebra-t').style.display = borderStyle === 'zebra' ? 'block' : 'none';
+            document.getElementById('zebra-b').style.display = borderStyle === 'zebra' ? 'block' : 'none';
+            document.getElementById('zebra-l').style.display = borderStyle === 'zebra' ? 'block' : 'none';
+            document.getElementById('zebra-r').style.display = borderStyle === 'zebra' ? 'block' : 'none';
+
+            if (borderStyle === 'standar' || borderStyle === 'zebra') {
                 graticuleLayer = L.latLngGraticule({
-                    showLabel: true,
+                    showLabel: false, 
                     color: gridColor,
-                    weight: 1, // Ketebalan garis grid
-                    dashArray: [5, 5], // Garis putus-putus
-                    font: '9px Arial', // Font angka koordinat
-                    fontColor: '#000',
-                    zoomInterval: [
-                        {start: 1, end: 10, interval: 0.1},
-                        {start: 11, end: 14, interval: 0.05},
-                        {start: 15, end: 20, interval: 0.01}
-                    ]
+                    weight: 1,
+                    dashArray: '', 
+                    zoomInterval: gridIntervals
                 }).addTo(map);
             }
+            drawEdgeCoordinates(); 
         }
 
-        // --- EVENT LISTENER UNTUK SKALA PETA (DINAMIS / KUSTOM) ---
+        // --- MANAJEMEN EVENT UNTUK ANTI-LAG (Hanya sembunyikan selama zoom Leaflet, jangan saat pan) ---
+        let isZooming = false;
+        
+        map.on('zoomstart', function() {
+            isZooming = true;
+            document.getElementById('edge-labels-container').style.display = 'none';
+        });
+        
+        map.on('zoomend', function() {
+            isZooming = false;
+            document.getElementById('edge-labels-container').style.display = 'block';
+            drawEdgeCoordinates();
+            
+            if (document.getElementById('select-skala-mode').value === 'dinamis') {
+                document.getElementById('display-skala').innerText = `1 : ${getMapScale().toLocaleString('id-ID')}`;
+            }
+        });
+        
+        // Panning (Drag) tetap mengalir bersama teks! (Tanpa Delay)
+        map.on('move', function() {
+            if (!isZooming && document.getElementById('edge-labels-container').style.display !== 'none') {
+                drawEdgeCoordinates();
+            }
+        });
+
+        // --- PENGATURAN SKALA MODE ---
         const selectSkalaMode = document.getElementById('select-skala-mode');
         const inputTargetSkala = document.getElementById('input-target-skala');
 
         selectSkalaMode.addEventListener('change', function() {
-            if(this.value === 'dinamis') {
-                inputTargetSkala.disabled = true;
-            } else {
-                inputTargetSkala.disabled = false;
-            }
+            inputTargetSkala.disabled = (this.value === 'dinamis');
             updateMapDisplay();
         });
-
+        
         inputTargetSkala.addEventListener('change', function() {
-            if(selectSkalaMode.value === 'kustom') {
-                updateMapDisplay();
-            }
+            if(selectSkalaMode.value === 'kustom') updateMapDisplay();
         });
 
         // 5. Update Tampilan Peta Utama & Peta Inset
@@ -595,13 +749,12 @@
                 miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
             }
 
-            // Pengaturan Fitur Skala Peta (Dinamis / Kustom Fix)
+            // Eksekusi Logika Skala Otomatis (Dinamis / Kustom)
             if (skalaMode === 'dinamis') {
                 if (layerDesa.getLayers().length > 0) {
                     map.fitBounds(layerDesa.getBounds());
                 }
-                let currentZoom = map.getZoom();
-                let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
+                let estimatedScale = getMapScale();
                 document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
             } else {
                 let targetScale = parseInt(inputTargetSkala.value) || 25000;
@@ -615,14 +768,6 @@
 
             updateGraticuleAndBorder();
         }
-
-        map.on('zoomend', function() {
-            if (selectSkalaMode.value === 'dinamis') {
-                let currentZoom = map.getZoom();
-                let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
-                document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
-            }
-        });
 
         ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'select-grid-color'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
