@@ -26,7 +26,8 @@
         .form-group { margin-bottom: 8px; }
         .form-group:last-child { margin-bottom: 0; }
         .form-group label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 9px; color: #333; text-transform: uppercase; }
-        .form-group select, .form-group input[type="text"], .form-group input[type="file"] { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
+        .form-group select, .form-group input[type="text"], .form-group input[type="number"], .form-group input[type="file"] { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 11px; background: #fff; color: #333; }
+        .form-group input:disabled { background: #ecf0f1; cursor: not-allowed; }
         
         .select2-container--default .select2-selection--single { border: 1px solid #ccc; border-radius: 4px; height: 28px; background-color: #fff; }
         .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 26px; font-size: 11px; color: #333; padding-left: 6px; }
@@ -44,14 +45,8 @@
         .map-frame-wrapper { grid-row: 2 / 3; grid-column: 1 / 2; position: relative; background: #fff; border-right: 2px solid #000000; box-sizing: border-box; padding: 35px; }
         #map { width: 100%; height: 100%; border: 1.5px solid #000000; box-sizing: border-box; background: #fff; z-index: 1; }
 
-        /* Styling Angka Graticule Koordinat di Tepi Peta */
-        .leaflet-container .leaflet-grat-label { font-size: 8px !important; color: #000000 !important; background: rgba(255,255,255,0.85); padding: 1px 3px; border-radius: 2px; font-family: 'Courier New', Courier, monospace; font-weight: bold; z-index: 999; }
-
-        /* Border Zebra Hitam-Putih */
-        .border-zebra-top, .border-zebra-bottom { position: absolute; left: 35px; right: 35px; height: 5px; background: repeating-linear-gradient(90deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
-        .border-zebra-top { top: 30px; } .border-zebra-bottom { bottom: 30px; }
-        .border-zebra-left, .border-zebra-right { position: absolute; top: 35px; bottom: 35px; width: 5px; background: repeating-linear-gradient(0deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
-        .border-zebra-left { left: 30px; } .border-zebra-right { right: 30px; }
+        /* Styling Angka Graticule Koordinat di Sekitar Tepi Peta */
+        .leaflet-container .leaflet-grat-label { font-size: 9px !important; color: #000000 !important; background: #ffffff !important; padding: 2px 4px; border: 1px solid #000000; font-family: Arial, Helvetica, sans-serif; font-weight: bold; z-index: 999; border-radius: 2px; }
 
         .leaflet-control-attribution { display: none !important; }
         .region-label { font-weight: bold; text-align: center; white-space: nowrap; cursor: move; }
@@ -212,11 +207,9 @@
             </div>
             <div style="display: flex; gap: 5px;">
                 <div class="form-group" style="flex: 1;">
-                    <label>Bentuk Grid Angka</label>
+                    <label>Bentuk Grid</label>
                     <select id="select-border">
-                        <option value="standar" selected>Standar (Graticule)</option>
-                        <option value="zebra">Gaya Zebra</option>
-                        <option value="grid-saja">Hanya Grid</option>
+                        <option value="standar" selected>Standar</option>
                         <option value="tidak">Tanpa Grid</option>
                     </select>
                 </div>
@@ -229,15 +222,19 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group" style="margin-top: 6px;">
-                <label>Skala Peta</label>
-                <select id="select-skala-mode">
-                    <option value="otomatis" selected>Dinamis Otomatis (Mengikuti Zoom)</option>
-                    <option value="10000">1 : 10.000</option>
-                    <option value="25000">1 : 25.000</option>
-                    <option value="50000">1 : 50.000</option>
-                    <option value="100000">1 : 100.000</option>
-                </select>
+            <!-- INPUT SKALA SEPERTI GAMBAR (Dinamis / Kustom Fix) -->
+            <div style="display: flex; gap: 5px; margin-top: 6px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Skala Peta</label>
+                    <select id="select-skala-mode">
+                        <option value="dinamis">Dinamis</option>
+                        <option value="kustom" selected>Kustom Fix</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Target Skala</label>
+                    <input type="number" id="input-target-skala" value="25000">
+                </div>
             </div>
         </div>
 
@@ -282,10 +279,6 @@
             
             <div class="map-frame-wrapper">
                 <div id="map"></div>
-                <div class="border-zebra-top" id="zebra-t"></div>
-                <div class="border-zebra-bottom" id="zebra-b"></div>
-                <div class="border-zebra-left" id="zebra-l"></div>
-                <div class="border-zebra-right" id="zebra-r"></div>
             </div>
 
             <div class="qgis-side-panel">
@@ -295,7 +288,7 @@
                 </div>
                 <div class="map-element">
                     <h4>SKALA PETA</h4>
-                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">1 : 50.000</div>
+                    <div id="display-skala" style="text-align: center; font-weight: bold; font-size: 11px; color: #000;">1 : 25.000</div>
                 </div>
                 <div class="map-element">
                     <h4>KETERANGAN</h4>
@@ -336,6 +329,9 @@
         // --- INISIALISASI PETA UTAMA ---
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
+
+        // Tambahkan Scale Bar Control otomatis di pojok kiri bawah peta
+        L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
 
         // --- BASEMAPS DEFINITION ---
         const basemaps = {
@@ -465,8 +461,7 @@
 
         // 4. Tangkap event pemilihan desa dengan Select2 secara akurat
         $('#select-desa').on('select2:select', function (e) {
-            let selectedValue = e.params.data.id;
-            selectDesa.value = selectedValue; // Memastikan nilai elemen DOM ikut terupdate
+            selectDesa.value = e.params.data.id;
             updateMapDisplay();
         });
 
@@ -482,24 +477,43 @@
         function updateGraticuleAndBorder() {
             if (graticuleLayer) map.removeLayer(graticuleLayer);
             let borderStyle = document.getElementById('select-border').value;
-            let gridColor = document.getElementById('input-grid-color').value;
+            let gridColor = document.getElementById('select-grid-color').value;
 
-            document.getElementById('zebra-t').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-b').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-l').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-r').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-
-            if (borderStyle === 'standar' || borderStyle === 'grid-saja') {
+            if (borderStyle === 'standar') {
                 graticuleLayer = L.latLngGraticule({
                     showLabel: true,
                     color: gridColor,
-                    weight: 0.6,
-                    dashArray: [4, 4],
-                    font: '9px Courier New',
-                    zoomInterval: [ {start: 1, end: 18, interval: 0.02} ]
+                    weight: 1, // Ketebalan garis grid
+                    dashArray: [5, 5], // Garis putus-putus
+                    font: '9px Arial', // Font angka koordinat
+                    fontColor: '#000',
+                    zoomInterval: [
+                        {start: 1, end: 10, interval: 0.1},
+                        {start: 11, end: 14, interval: 0.05},
+                        {start: 15, end: 20, interval: 0.01}
+                    ]
                 }).addTo(map);
             }
         }
+
+        // --- EVENT LISTENER UNTUK SKALA PETA (DINAMIS / KUSTOM) ---
+        const selectSkalaMode = document.getElementById('select-skala-mode');
+        const inputTargetSkala = document.getElementById('input-target-skala');
+
+        selectSkalaMode.addEventListener('change', function() {
+            if(this.value === 'dinamis') {
+                inputTargetSkala.disabled = true;
+            } else {
+                inputTargetSkala.disabled = false;
+            }
+            updateMapDisplay();
+        });
+
+        inputTargetSkala.addEventListener('change', function() {
+            if(selectSkalaMode.value === 'kustom') {
+                updateMapDisplay();
+            }
+        });
 
         // 5. Update Tampilan Peta Utama & Peta Inset
         function updateMapDisplay() {
@@ -517,7 +531,7 @@
             let dashVal = document.getElementById('select-dash').value;
             let showLabels = document.getElementById('select-show-label').value === 'ya';
             let maskingVal = document.getElementById('select-masking').value;
-            let skalaMode = document.getElementById('select-skala-mode').value;
+            let skalaMode = selectSkalaMode.value;
             
             let labelColor = document.getElementById('select-label-color').value === 'putih' ? '#ffffff' : '#000000';
             let labelBg = document.getElementById('select-label-color').value === 'putih' ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
@@ -581,8 +595,8 @@
                 miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
             }
 
-            // Pengaturan Fitur Skala Peta (Manual vs Otomatis)
-            if (skalaMode === 'otomatis') {
+            // Pengaturan Fitur Skala Peta (Dinamis / Kustom Fix)
+            if (skalaMode === 'dinamis') {
                 if (layerDesa.getLayers().length > 0) {
                     map.fitBounds(layerDesa.getBounds());
                 }
@@ -590,7 +604,7 @@
                 let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
                 document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
             } else {
-                let targetScale = parseInt(skalaMode);
+                let targetScale = parseInt(inputTargetSkala.value) || 25000;
                 let targetZoom = Math.round(Math.log(50000000 / targetScale) / Math.LN2);
                 if (matchedFeature) {
                     let center = turf.center(matchedFeature).geometry.coordinates;
@@ -603,19 +617,14 @@
         }
 
         map.on('zoomend', function() {
-            let skalaMode = document.getElementById('select-skala-mode').value;
-            if (skalaMode === 'otomatis') {
+            if (selectSkalaMode.value === 'dinamis') {
                 let currentZoom = map.getZoom();
                 let estimatedScale = Math.round(50000000 / Math.pow(2, currentZoom));
                 document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
             }
         });
 
-        document.getElementById('select-skala-mode').addEventListener('change', function() {
-            updateMapDisplay();
-        });
-
-        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'input-grid-color'].forEach(id => {
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'select-grid-color'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
                 updateMapDisplay();
                 updateLegendDisplay(); 
