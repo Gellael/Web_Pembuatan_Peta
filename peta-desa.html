@@ -42,21 +42,15 @@
         .qgis-header h1 { margin: 0; font-size: 15px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Times New Roman', Times, serif; color: #000; }
         .qgis-header p { margin: 2px 0 0 0; font-size: 10px; color: #444; font-family: Arial, sans-serif; }
         
-        /* Layout Margin Tepi Peta (Padding 35px untuk ruang putih di luar garis hitam) */
         .map-frame-wrapper { grid-row: 2 / 3; grid-column: 1 / 2; position: relative; background: #fff; border-right: 2px solid #000000; box-sizing: border-box; padding: 35px; }
-        
-        /* Map Leaflet berada tepat di dalam garis hitam inner */
         #map { width: 100%; height: 100%; border: 1.5px solid #000000; box-sizing: border-box; background: #fff; z-index: 1; }
 
-        /* Container Absolut Khusus Teks Koordinat Tepi agar STAY stabil */
-        #edge-labels-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 1000; overflow: hidden; }
-        
-        /* Desain Label Koordinat yang terkunci presisi */
-        .coord-label { position: absolute; font-family: 'Times New Roman', Times, serif; font-size: 10px; font-weight: bold; color: #000; white-space: nowrap; }
-
-        /* Kustomisasi Skala Bar Box di dalam peta (Kiri Bawah) */
-        .leaflet-control-scale-line { background: rgba(255, 255, 255, 0.95) !important; border: 1.5px solid #000 !important; border-top: none !important; color: #000 !important; font-weight: bold; font-family: Arial, sans-serif; font-size: 10px; padding: 2px 6px !important; border-radius: 0 !important; box-shadow: none !important; }
-        .leaflet-control-scale-line:not(:first-child) { border-top: 1.5px solid #000 !important; border-bottom: none !important; margin-top: -1.5px; }
+        /* Label Koordinat di LUAR Frame Peta (Stay Presisi) */
+        .qgis-border-label { position: absolute; font-size: 8px; font-weight: bold; color: #000; background: #ffffff; padding: 1px 2px; z-index: 999; pointer-events: none; font-family: 'Courier New', Courier, monospace; }
+        .label-top { top: 15px; transform: translateX(-50%); } 
+        .label-bottom { bottom: 15px; transform: translateX(-50%); }
+        .label-left { left: 10px; top: 50%; transform: translateY(-50%) rotate(-90deg); white-space: nowrap; }
+        .label-right { right: 10px; top: 50%; transform: translateY(-50%) rotate(90deg); white-space: nowrap; }
 
         /* Border Zebra Hitam-Putih */
         .border-zebra-top, .border-zebra-bottom { position: absolute; left: 35px; right: 35px; height: 5px; background: repeating-linear-gradient(90deg, #000, #000 10px, #fff 10px, #fff 20px); z-index: 998; pointer-events: none; display: none; }
@@ -80,6 +74,7 @@
         .btn-pdf { background: #c0392b; } .btn-pdf:hover { background: #a93226; }
         .btn-marker { background: #2980b9; margin-bottom: 4px; } .btn-marker:hover { background: #1f618d; }
         .btn-annot { background: #8e44ad; margin-bottom: 4px; } .btn-annot:hover { background: #732d91; }
+        .btn-osm { background: #d35400; margin-top: 4px; } .btn-osm:hover { background: #ba4a00; }
 
         @media print {
             @page { size: A4 landscape; margin: 0; }
@@ -163,6 +158,18 @@
             </div>
         </div>
 
+        <!-- STEP 3.5: FITUR TAMBAHAN OSM UNTUK DESA -->
+        <div class="control-card">
+            <h3 class="card-step-title" style="color: #d35400;">🌐 Layer Detail OSM (Desa Terpilih)</h3>
+            <div style="display: flex; gap: 5px; margin-bottom: 6px;">
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-buildings"> Bangunan</label></div>
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-water"> Aliran Air</label></div>
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-roads"> Jalan</label></div>
+            </div>
+            <button class="btn-action btn-osm" onclick="loadOsmFeaturesForCurrentVillage()">Muat Data Detail OSM Desa</button>
+            <small style="font-size: 8px; color: #7f8c8d; display:block; margin-top:4px;">*Pastikan Desa sudah dipilih agar batasan area render presisi.</small>
+        </div>
+
         <!-- STEP 4: LABEL & MASKING -->
         <div class="control-card">
             <h3 class="card-step-title">4. Label Teks & Masking</h3>
@@ -193,10 +200,9 @@
             <div class="form-group" style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #bdc3c7;">
                 <label style="color: #8e44ad;">🌒 Efek Penggelapan (Masking Luar)</label>
                 <select id="select-masking">
-                    <option value="tidak">Tanpa Efek (Normal)</option>
-                    <option value="0.3">Gelap Tipis (30%)</option>
-                    <option value="0.5">Gelap Sedang (50%)</option>
-                    <option value="0.75">Gelap Pekat (75%)</option>
+                    <option value="none">Tanpa Efek (Normal)</option>
+                    <option value="dim">Gelapkan Sekitar (Highlight)</option>
+                    <option value="solid">Potong Solid (Isolasi)</option>
                 </select>
             </div>
         </div>
@@ -225,8 +231,9 @@
                 <div class="form-group" style="flex: 1;">
                     <label>Bentuk Grid</label>
                     <select id="select-border">
-                        <option value="standar" selected>Standar (Garis Putih)</option>
+                        <option value="standar" selected>Standar</option>
                         <option value="zebra">Gaya Zebra</option>
+                        <option value="grid-saja">Hanya Grid</option>
                         <option value="tidak">Tanpa Grid</option>
                     </select>
                 </div>
@@ -239,18 +246,17 @@
                     </select>
                 </div>
             </div>
-            <!-- SKALA OTOMATIS DINAMIS SEBAGAI DEFAULT -->
             <div style="display: flex; gap: 5px; margin-top: 6px;">
                 <div class="form-group" style="flex: 1;">
                     <label>Skala Peta</label>
                     <select id="select-skala-mode">
                         <option value="dinamis" selected>Dinamis</option>
-                        <option value="kustom">Kustom Fix</option>
+                        <option value="fix">Kustom Fix</option>
                     </select>
                 </div>
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group" id="group-skala-fix" style="display: none; flex: 1;">
                     <label>Target Skala</label>
-                    <input type="number" id="input-target-skala" value="25000" disabled>
+                    <input type="number" id="input-skala-fix" value="25000" min="1000" step="1000">
                 </div>
             </div>
         </div>
@@ -281,8 +287,8 @@
             </div>
         </div>
 
-        <button class="btn-action btn-png" onclick="exportToPNG()">Download Kanvas Peta (PNG)</button>
-        <button class="btn-action btn-pdf" onclick="exportToPDF()">Cetak / Ekspor PDF</button>
+        <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()">Download Kanvas Peta (PNG)</button>
+        <button class="btn-action btn-pdf" id="btn-export-pdf" onclick="exportToPDF()">Cetak / Ekspor PDF</button>
         <br><br>
     </div>
 
@@ -295,11 +301,8 @@
             </div>
             
             <div class="map-frame-wrapper">
-                <!-- Inner Container Leaflet Map -->
                 <div id="map"></div>
-                
-                <!-- CONTAINER ABSOLUT LABEL KOORDINAT - ANTI LAG/STAY FIX -->
-                <div id="edge-labels-container"></div>
+                <div id="border-labels-container"></div>
                 
                 <div class="border-zebra-top" id="zebra-t"></div>
                 <div class="border-zebra-bottom" id="zebra-b"></div>
@@ -329,7 +332,6 @@
                         <span style="display:inline-block; width:10px; height:10px; background:#3498db; opacity:0.6; border:1px solid #2980b9; vertical-align:middle;"></span> Seluruh Indonesia
                     </div>
                 </div>
-                <!-- PETA INSET / MINI MAP -->
                 <div class="map-element" style="padding: 2px;">
                     <h4 style="margin-bottom: 2px;">PETA INSET</h4>
                     <div id="mini-map-box"></div>
@@ -342,6 +344,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet-latlng-graticule@1.2.0/L.latLngGraticule.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <!-- osmtogeojson -->
+    <script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -355,6 +359,7 @@
         // --- INISIALISASI PETA UTAMA ---
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
         let labelLayer = L.layerGroup().addTo(map);
+        let osmLayerGroup = L.layerGroup().addTo(map);
 
         L.control.scale({ position: 'bottomleft', metric: true, imperial: false }).addTo(map);
 
@@ -368,21 +373,22 @@
             hot: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
             toner: L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true }),
             voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, crossOrigin: true }),
-            cyclosm: L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true }),
+            cyclosm: L.tileLayer('https://{s}.cyclosm.org/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true }),
             natgeo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, crossOrigin: true }),
             terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', { maxZoom: 13, crossOrigin: true }),
-            humanitarian: L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true })
+            humanitarian: L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', { maxZoom: 20, crossOrigin: true })
         };
         let currentBasemap = basemaps.satellite.addTo(map);
 
         document.getElementById('select-basemap').addEventListener('change', function() {
             if (currentBasemap) map.removeLayer(currentBasemap);
             currentBasemap = (basemaps[this.value] || basemaps.osm).addTo(map);
+            miniMapBase.setUrl(currentBasemap._url);
         });
 
         // --- INISIALISASI PETA INSET (MINI-MAP) ---
-        var miniMap = L.map('mini-map-box', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false }).setView([-0.7893, 113.9213], 4);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 10 }).addTo(miniMap);
+        var miniMap = L.map('mini-map-box', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, preferCanvas: true }).setView([-0.7893, 113.9213], 4);
+        var miniMapBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 13, crossOrigin: true }).addTo(miniMap);
         let miniMapLayer = null;
 
         let desaData = null;
@@ -391,22 +397,82 @@
         let graticuleLayer = null;
         let localDataFallback = null;
 
-        // Master Grid Intervals
-        const gridIntervals = [
-            {start: 2, end: 3, interval: 10},
-            {start: 4, end: 5, interval: 5},
-            {start: 6, end: 7, interval: 2},
-            {start: 8, end: 9, interval: 1},
-            {start: 10, end: 10, interval: 0.5},
-            {start: 11, end: 11, interval: 0.2},
-            {start: 12, end: 13, interval: 0.1},
-            {start: 14, end: 14, interval: 0.05},
-            {start: 15, end: 15, interval: 0.02},
-            {start: 16, end: 16, interval: 0.01},
-            {start: 17, end: 17, interval: 0.005},
-            {start: 18, end: 18, interval: 0.002},
-            {start: 19, end: 20, interval: 0.001}
-        ];
+        // Kontrol Skala
+        const selectSkalaMode = document.getElementById('select-skala-mode');
+        const groupSkalaFix = document.getElementById('group-skala-fix');
+        const inputSkalaFix = document.getElementById('input-skala-fix');
+        const displaySkala = document.getElementById('display-skala');
+
+        selectSkalaMode.addEventListener('change', function() {
+            if (this.value === 'fix') { groupSkalaFix.style.display = 'block'; applyFixScale(); } 
+            else { groupSkalaFix.style.display = 'none'; updateDynamicScale(); }
+        });
+        inputSkalaFix.addEventListener('input', applyFixScale);
+
+        function applyFixScale() {
+            if (selectSkalaMode.value === 'fix') {
+                let targetScale = parseInt(inputSkalaFix.value) || 25000;
+                displaySkala.innerText = `1 : ${targetScale.toLocaleString('id-ID')}`;
+                let centerLat = map.getCenter().lat;
+                let targetZoom = Math.round(Math.log2(591657550.5 * Math.cos(centerLat * Math.PI / 180) / targetScale));
+                if(targetZoom >= 2 && targetZoom <= 19) map.setZoom(targetZoom);
+            }
+        }
+
+        function updateDynamicScale() {
+            if (selectSkalaMode.value === 'dinamis') {
+                let zoom = map.getZoom(), centerLat = map.getCenter().lat;
+                let scaleDenominator = Math.round(591657550.5 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, zoom));
+                displaySkala.innerText = `1 : ${scaleDenominator.toLocaleString('id-ID')}`;
+            }
+        }
+        map.on('zoomend moveend', function() { updateDynamicScale(); renderBorderCoordinates(); });
+
+        // --- RENDER BORDER & GRID KOORDINAT ---
+        const borderContainer = document.getElementById('border-labels-container');
+
+        function renderBorderCoordinates() {
+            borderContainer.innerHTML = '';
+            let mode = document.getElementById('select-border').value;
+            ['zebra-t','zebra-b','zebra-l','zebra-r'].forEach(id => document.getElementById(id).style.display = (mode === 'zebra') ? 'block' : 'none');
+
+            if (mode === 'tidak' || mode === 'grid-saja') return;
+            let bounds = map.getBounds(), sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+            let steps = 4, latStep = (ne.lat - sw.lat) / (steps + 1), lngStep = (ne.lng - sw.lng) / (steps + 1);
+
+            for (let i = 1; i <= steps; i++) {
+                let latVal = sw.lat + latStep * i, topPercent = (i / (steps + 1)) * 100;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-left" style="top:${topPercent}%">${latVal.toFixed(3)}°S</div>`;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-right" style="top:${topPercent}%">${latVal.toFixed(3)}°S</div>`;
+            }
+            for (let j = 1; j <= steps; j++) {
+                let lngVal = sw.lng + lngStep * j, leftPercent = (j / (steps + 1)) * 100;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-top" style="left:${leftPercent}%">${lngVal.toFixed(3)}°E</div>`;
+                borderContainer.innerHTML += `<div class="qgis-border-label label-bottom" style="left:${leftPercent}%">${lngVal.toFixed(3)}°E</div>`;
+            }
+        }
+
+        function setupGraticule() {
+            if (graticuleLayer) map.removeLayer(graticuleLayer);
+            let mode = document.getElementById('select-border').value;
+            let gridColor = document.getElementById('select-grid-color').value;
+
+            if (mode !== 'tidak' && typeof L.latLngGraticule === 'function') {
+                graticuleLayer = L.latLngGraticule({
+                    showLabel: false, color: gridColor, weight: 0.5, dashArray: [4, 4],
+                    zoomInterval: [
+                        {start: 2, end: 4, latInterval: 10, lngInterval: 10}, 
+                        {start: 5, end: 7, latInterval: 1, lngInterval: 1}, 
+                        {start: 8, end: 12, latInterval: 0.1, lngInterval: 0.1},
+                        {start: 13, end: 19, latInterval: 0.01, lngInterval: 0.01}
+                    ]
+                }).addTo(map);
+            }
+            renderBorderCoordinates();
+        }
+        setupGraticule();
+        document.getElementById('select-border').addEventListener('change', setupGraticule);
+        document.getElementById('select-grid-color').addEventListener('change', setupGraticule);
 
         fetch('data/38 Provinsi Indonesia - Kabupaten.json').then(res => res.json()).then(data => localDataFallback = data).catch(e => {});
 
@@ -417,8 +483,7 @@
         const infoWilayah = document.getElementById('info-wilayah');
         const dynamicLegend = document.getElementById('dynamic-legend');
 
-        $(document).ready(function() {
-            $('.select2-enable').select2({ width: '100%' });
+        $(document).ready(function() {$('.select2-enable').select2({ width: '100%' });
         });
 
         fetch('/api/get-wilayah')
@@ -467,10 +532,7 @@
             msgLoading.style.display = 'block';
             desaData = null;
 
-            if (!kab) { 
-                msgLoading.style.display = 'none'; 
-                return; 
-            }
+            if (!kab) { msgLoading.style.display = 'none'; return; }
 
             fetch(`/api/get-desa?kabupaten=${encodeURIComponent(kab)}`)
                 .then(res => res.json())
@@ -504,216 +566,133 @@
             updateMapDisplay();
         });
 
+        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM (DESA) ---
+        function loadOsmFeaturesForCurrentVillage() {
+            if (!layerDesa) {
+                alert("Silakan pilih Desa terlebih dahulu agar batas area pemanggilan presisi!");
+                return;
+            }
+
+            let b = layerDesa.getBounds();
+            let bboxStr = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+
+            let wantBuildings = document.getElementById('chk-buildings').checked;
+            let wantWater = document.getElementById('chk-water').checked;
+            let wantRoads = document.getElementById('chk-roads').checked;
+
+            if (!wantBuildings && !wantWater && !wantRoads) {
+                alert("Centang minimal salah satu opsi (Bangunan, Aliran Air, atau Jalan)!");
+                return;
+            }
+
+            let btn = document.querySelector('.btn-osm');
+            let origText = btn.innerText;
+            btn.innerText = "⏳ Mengunduh dari OSM...";
+
+            let queryParts = ['[out:json][timeout:30];\n('];
+            if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
+            if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
+            if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
+            queryParts.push(');\nout body;\n>;\nout skel qt;');
+
+            let query = queryParts.join('\n');
+
+            fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            })
+            .then(res => res.json())
+            .then(osmData => {
+                let geojson = osmtogeojson(osmData);
+                osmLayerGroup.clearLayers();
+
+                L.geoJSON(geojson, {
+                    style: function(feature) {
+                        let t = feature.properties;
+                        if (t.building) {
+                            return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
+                        } else if (t.natural === 'water' || t.waterway) {
+                            return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
+                        } else if (t.highway) {
+                            return { color: '#7f8c8d', weight: 1.0 };
+                        }
+                        return { color: '#333', weight: 1 };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
+                        layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+                    }
+                }).addTo(osmLayerGroup);
+
+                btn.innerText = origText;
+                alert("Data detail desa berhasil dimuat dari OpenStreetMap!");
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Gagal memuat data dari Overpass API. Coba lagi beberapa saat.");
+                btn.innerText = origText;
+            });
+        }
+
         function updateLegendDisplay() {
             const fillColor = document.getElementById('input-fill-color').value;
             const selectedDesa = selectDesa.value;
             const customText = document.getElementById('input-teks-legenda').value.trim();
             let legendText = customText !== "" ? customText : (selectedDesa ? `Kel. ${selectedDesa}` : "Seluruh Indonesia");
-            dynamicLegend.innerHTML = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}`;
-        }
-
-        // --- ALGORITMA PERHITUNGAN SKALA DINAMIS ---
-        function getMapScale() {
-            let centerLat = map.getCenter().lat;
-            let currentZoom = map.getZoom();
-            let metersPerPixel = 156543.03392 * Math.cos(centerLat * Math.PI / 180) / Math.pow(2, currentZoom);
-            let scaleRatio = metersPerPixel * 3779.527559; 
             
-            if (scaleRatio > 1000000) return Math.round(scaleRatio / 100000) * 100000;
-            if (scaleRatio > 100000) return Math.round(scaleRatio / 10000) * 10000;
-            if (scaleRatio > 10000) return Math.round(scaleRatio / 1000) * 1000;
-            if (scaleRatio > 1000) return Math.round(scaleRatio / 500) * 500;
-            return Math.round(scaleRatio);
+            let html = `<span style="display:inline-block; width:10px; height:10px; background:${fillColor}; opacity:0.7; border:1px solid #d35400; vertical-align:middle;"></span> ${legendText}<br>`;
+            customMarkers.forEach(cm => {
+                html += `<div style="margin-top:3px; display:flex; align-items:center; gap:5px;"><span>${getMarkerHtml(cm.shape, cm.color, cm.label)}</span> <span>${cm.label}</span></div>`;
+            });
+            dynamicLegend.innerHTML = html;
         }
 
-        // --- SISTEM TEKS KOORDINAT ANTI-LAG (STAY & FIXED) ---
-        function drawEdgeCoordinates() {
-            const container = document.getElementById('edge-labels-container');
-            container.innerHTML = ''; 
-
-            let borderStyle = document.getElementById('select-border').value;
-            if (borderStyle === 'tidak') return;
-
-            let zoom = map.getZoom();
-            let interval = 0.02;
-            for (let i = 0; i < gridIntervals.length; i++) {
-                if (zoom >= gridIntervals[i].start && zoom <= gridIntervals[i].end) {
-                    interval = gridIntervals[i].interval; 
-                    break;
-                }
-            }
-
-            let bounds = map.getBounds();
-            let w = bounds.getWest(), e = bounds.getEast(), n = bounds.getNorth(), s = bounds.getSouth();
-            let mapSize = map.getSize();
-
-            function formatCoord(val, type) {
-                let dir = (type === 'lat') ? (val >= 0 ? 'N' : 'S') : (val >= 0 ? 'E' : 'W');
-                let dec = interval < 0.1 ? (interval < 0.01 ? 3 : 2) : 1; 
-                let fixedVal = Math.abs(val).toFixed(dec);
-                return `${fixedVal}°${dir}`;
-            }
-
-            let eps = interval * 0.1;
-
-            // X-axis (Longitude - Garis Vertikal) Label Atas & Bawah
-            let startLng = Math.ceil(w / interval) * interval;
-            for (let lng = startLng; lng <= e + eps; lng += interval) {
-                let pt = map.latLngToContainerPoint([n, lng]);
-                if (pt.x < 0 || pt.x > mapSize.x) continue;
-                
-                let cx = pt.x + 35; // Tambah padding margin 35px
-                let text = formatCoord(lng, 'lng');
-                
-                let topLbl = document.createElement('div');
-                topLbl.className = 'coord-label';
-                topLbl.innerText = text;
-                topLbl.style.left = cx + 'px';
-                topLbl.style.top = '17px'; 
-                topLbl.style.transform = 'translate(-50%, -50%)';
-                container.appendChild(topLbl);
-                
-                let botLbl = document.createElement('div');
-                botLbl.className = 'coord-label';
-                botLbl.innerText = text;
-                botLbl.style.left = cx + 'px';
-                botLbl.style.bottom = '17px';
-                botLbl.style.transform = 'translate(-50%, 50%)';
-                container.appendChild(botLbl);
-            }
-
-            // Y-axis (Latitude - Garis Horizontal) Label Kiri & Kanan (Diputar 90 deg)
-            let startLat = Math.ceil(s / interval) * interval;
-            for (let lat = startLat; lat <= n + eps; lat += interval) {
-                let pt = map.latLngToContainerPoint([lat, w]);
-                if (pt.y < 0 || pt.y > mapSize.y) continue;
-                
-                let cy = pt.y + 35; // Tambah padding margin 35px
-                let text = formatCoord(lat, 'lat');
-                
-                let leftLbl = document.createElement('div');
-                leftLbl.className = 'coord-label';
-                leftLbl.innerText = text;
-                leftLbl.style.top = cy + 'px';
-                leftLbl.style.left = '17px'; 
-                leftLbl.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
-                container.appendChild(leftLbl);
-                
-                let rightLbl = document.createElement('div');
-                rightLbl.className = 'coord-label';
-                rightLbl.innerText = text;
-                rightLbl.style.top = cy + 'px';
-                rightLbl.style.left = (mapSize.x + 53) + 'px'; // 35px border + margin kanan
-                rightLbl.style.transform = 'translate(-50%, -50%) rotate(90deg)';
-                container.appendChild(rightLbl);
-            }
-        }
-
-        function updateGraticuleAndBorder() {
-            if (graticuleLayer) map.removeLayer(graticuleLayer);
-            let borderStyle = document.getElementById('select-border').value;
-            let gridColor = document.getElementById('select-grid-color').value;
-
-            document.getElementById('zebra-t').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-b').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-l').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-            document.getElementById('zebra-r').style.display = borderStyle === 'zebra' ? 'block' : 'none';
-
-            if (borderStyle === 'standar' || borderStyle === 'zebra') {
-                graticuleLayer = L.latLngGraticule({
-                    showLabel: false, 
-                    color: gridColor,
-                    weight: 1,
-                    dashArray: '', 
-                    zoomInterval: gridIntervals
-                }).addTo(map);
-            }
-            drawEdgeCoordinates(); 
-        }
-
-        // --- MANAJEMEN EVENT UNTUK ANTI-LAG (Hanya sembunyikan selama zoom Leaflet, jangan saat pan) ---
-        let isZooming = false;
-        
-        map.on('zoomstart', function() {
-            isZooming = true;
-            document.getElementById('edge-labels-container').style.display = 'none';
-        });
-        
-        map.on('zoomend', function() {
-            isZooming = false;
-            document.getElementById('edge-labels-container').style.display = 'block';
-            drawEdgeCoordinates();
-            
-            if (document.getElementById('select-skala-mode').value === 'dinamis') {
-                document.getElementById('display-skala').innerText = `1 : ${getMapScale().toLocaleString('id-ID')}`;
-            }
-        });
-        
-        // Panning (Drag) tetap mengalir bersama teks! (Tanpa Delay)
-        map.on('move', function() {
-            if (!isZooming && document.getElementById('edge-labels-container').style.display !== 'none') {
-                drawEdgeCoordinates();
-            }
-        });
-
-        // --- PENGATURAN SKALA MODE ---
-        const selectSkalaMode = document.getElementById('select-skala-mode');
-        const inputTargetSkala = document.getElementById('input-target-skala');
-
-        selectSkalaMode.addEventListener('change', function() {
-            inputTargetSkala.disabled = (this.value === 'dinamis');
-            updateMapDisplay();
-        });
-        
-        inputTargetSkala.addEventListener('change', function() {
-            if(selectSkalaMode.value === 'kustom') updateMapDisplay();
-        });
-
-        // 5. Update Tampilan Peta Utama & Peta Inset
         function updateMapDisplay() {
             let selectedDesa = selectDesa.value;
             if (!desaData || !desaData.features || !selectedDesa) return;
 
             if (layerDesa) map.removeLayer(layerDesa);
             if (maskLayer) map.removeLayer(maskLayer);
-            if (miniMapLayer) miniMap.removeLayer(miniMapLayer);
             labelLayer.clearLayers();
+            osmLayerGroup.clearLayers();
 
             let fillColor = document.getElementById('input-fill-color').value;
             let opacityVal = parseFloat(document.getElementById('select-opacity').value);
             let weightVal = parseFloat(document.getElementById('select-weight').value);
             let dashVal = document.getElementById('select-dash').value;
             let showLabels = document.getElementById('select-show-label').value === 'ya';
-            let maskingVal = document.getElementById('select-masking').value;
-            let skalaMode = selectSkalaMode.value;
+            let maskMode = document.getElementById('select-masking').value;
             
-            let labelColor = document.getElementById('select-label-color').value === 'putih' ? '#ffffff' : '#000000';
-            let labelBg = document.getElementById('select-label-color').value === 'putih' ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
+            let labelColor = document.getElementById('select-label-color').value;
+            let fontColor = labelColor === 'putih' ? '#ffffff' : '#111111';
+            let outlineColor = labelColor === 'putih' ? '#111111' : '#ffffff';
             let labelSizeVal = document.getElementById('select-label-size').value;
-            let labelFontSize = labelSizeVal === 'kecil' ? '7px' : (labelSizeVal === 'besar' ? '12px' : '9px');
+            let fontSize = labelSizeVal === 'kecil' ? '7px' : (labelSizeVal === 'besar' ? '12px' : '9px');
+            let textShadowStyle = `1px 1px 0 ${outlineColor}, -1px -1px 0 ${outlineColor}, 1px -1px 0 ${outlineColor}, -1px 1px 0 ${outlineColor}, 0px 0px 4px ${outlineColor}`;
 
             let matchedFeature = null;
+            let matchingFeatures = [];
 
             desaData.features.forEach(f => {
                 let des = f.properties.WADMKD || f.properties.wadmkd || '';
-                if (des === selectedDesa) matchedFeature = f;
+                if (des === selectedDesa) {
+                    matchedFeature = f;
+                    matchingFeatures.push(f);
+                }
             });
 
-            // Masking Luar Wilayah
-            if (maskingVal !== "tidak" && matchedFeature) {
+            if (maskMode !== 'none' && matchedFeature) {
                 try {
-                    let worldBox = turf.polygon([[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]);
-                    let maskGeoJSON = turf.difference(worldBox, matchedFeature);
-                    if (maskGeoJSON) {
-                        maskLayer = L.geoJSON(maskGeoJSON, {
-                            style: { fillColor: '#000000', fillOpacity: parseFloat(maskingVal), weight: 0, color: 'transparent' },
-                            interactive: false
-                        }).addTo(map);
-                    }
+                    let fc = turf.featureCollection(matchingFeatures);
+                    let combined = turf.combine(fc);
+                    let maskedPolygon = turf.mask(combined);
+
+                    let mColor = maskMode === 'dim' ? '#000000' : '#ffffff';
+                    let mOpacity = maskMode === 'dim' ? 0.65 : 1.0;
+                    maskLayer = L.geoJSON(maskedPolygon, { stroke: false, fillColor: mColor, fillOpacity: mOpacity, interactive: false }).addTo(map);
                 } catch(e) {}
             }
 
-            // Layer Poligon Desa Utama
             layerDesa = L.geoJSON(desaData, {
                 filter: function(f) {
                     let p = f.properties;
@@ -734,42 +713,37 @@
                         try {
                             let pt = turf.pointOnFeature(feature);
                             let center = [pt.geometry.coordinates[1], pt.geometry.coordinates[0]];
-                            let htmlContent = `<div class="region-label" style="font-size:${labelFontSize}; color:${labelColor}; background:${labelBg}; padding:3px 6px; border-radius:3px; border:1px solid ${labelColor};">${desa}</div>`;
-                            labelLayer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [150, 25], iconAnchor: [75, 12] }), draggable: true }));
+                            let htmlContent = `<div class="region-label" style="color:${fontColor}; font-size:${fontSize}; text-shadow:${textShadowStyle};">${desa}</div>`;
+                            labelLayer.addLayer(L.marker(center, { icon: L.divIcon({ className: 'custom-region-label', html: htmlContent, iconSize: [120, 20], iconAnchor: [60, 10] }), draggable: true }));
                         } catch(e){}
                     }
                 }
             }).addTo(map);
 
-            // Tampilkan di Peta Inset (Mini-map)
+            if (maskLayer && layerDesa) {
+                layerDesa.bringToFront();
+            }
+
             if (matchedFeature) {
+                if (miniMapLayer) miniMap.removeLayer(miniMapLayer);
                 miniMapLayer = L.geoJSON(matchedFeature, {
                     style: { color: '#e74c3c', weight: 1.5, fillColor: '#e74c3c', fillOpacity: 0.8 }
                 }).addTo(miniMap);
-                miniMap.fitBounds(miniMapLayer.getBounds(), { padding: [10, 10] });
+                try { miniMap.fitBounds(miniMapLayer.getBounds()); } catch(e) {}
             }
 
-            // Eksekusi Logika Skala Otomatis (Dinamis / Kustom)
-            if (skalaMode === 'dinamis') {
+            if (selectSkalaMode.value === 'dinamis') {
                 if (layerDesa.getLayers().length > 0) {
                     map.fitBounds(layerDesa.getBounds());
                 }
-                let estimatedScale = getMapScale();
-                document.getElementById('display-skala').innerText = `1 : ${estimatedScale.toLocaleString('id-ID')}`;
+                updateDynamicScale();
             } else {
-                let targetScale = parseInt(inputTargetSkala.value) || 25000;
-                let targetZoom = Math.round(Math.log(50000000 / targetScale) / Math.LN2);
-                if (matchedFeature) {
-                    let center = turf.center(matchedFeature).geometry.coordinates;
-                    map.setView([center[1], center[0]], targetZoom);
-                }
-                document.getElementById('display-skala').innerText = `1 : ${targetScale.toLocaleString('id-ID')}`;
+                applyFixScale();
             }
-
-            updateGraticuleAndBorder();
+            renderBorderCoordinates();
         }
 
-        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking', 'select-border', 'select-grid-color'].forEach(id => {
+        ['input-fill-color', 'select-opacity', 'select-weight', 'select-dash', 'select-show-label', 'select-label-color', 'select-label-size', 'select-masking'].forEach(id => {
             document.getElementById(id).addEventListener('change', () => {
                 updateMapDisplay();
                 updateLegendDisplay(); 
@@ -782,8 +756,18 @@
 
         document.getElementById('input-annot-img').addEventListener('change', function(e) {
             let file = e.target.files[0];
-            if(file) { let reader = new FileReader(); reader.onload = evt => currentUploadedImageBase64 = evt.target.result; reader.readAsDataURL(file); }
+            if(file) { 
+                let reader = new FileReader(); 
+                reader.onload = evt => currentUploadedImageBase64 = evt.target.result; 
+                reader.readAsDataURL(file); 
+            }
         });
+
+        function getMarkerHtml(shape, color, labelText = '') {
+            if (shape === 'circle') return `<div style="width: 12px; height: 12px; background: ${color}; border: 1px solid #fff; border-radius: 50%; display:inline-block; vertical-align:middle;"></div>`;
+            else if (shape === 'home') return `<span style="font-size: 14px; color: ${color}; display:inline-block; vertical-align:middle;">🏠</span>`;
+            else return `<div style="width: 12px; height: 18px; background: ${color}; border: 1px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display:inline-block; vertical-align:middle; margin:2px;"></div>`;
+        }
 
         function toggleMarkerMode() { isAddingMarker = !isAddingMarker; isAddingAnnotation = false; }
         function toggleAnnotationMode() { if(!currentUploadedImageBase64) { alert("Pilih gambar dulu!"); return; } isAddingAnnotation = !isAddingAnnotation; isAddingMarker = false; }
@@ -791,12 +775,14 @@
         map.on('click', function(e) {
             if (isAddingMarker) {
                 let labelText = document.getElementById('input-marker-label').value.trim() || `Titik`;
+                let shape = document.getElementById('select-marker-shape').value;
                 let color = document.getElementById('input-marker-color').value;
                 let currentId = markerIdCounter++;
-                let icon = L.divIcon({ className: 'custom-map-icon', html: `<div style="width:12px;height:12px;background:${color};border-radius:50%;border:1px solid #fff;"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
+                let icon = L.divIcon({ className: 'custom-map-icon', html: `<div style="text-align:center;">${getMarkerHtml(shape, color, labelText)}</div>`, iconSize: [24, 24], iconAnchor: [12, 20] });
                 let marker = L.marker(e.latlng, { icon: icon }).addTo(map);
                 marker.bindPopup(`<b>${labelText}</b><br><button onclick="removeCustomMarker(${currentId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:3px 8px; border-radius:3px; cursor:pointer;">Hapus</button>`);
-                customMarkers.push({ id: currentId, marker: marker });
+                customMarkers.push({ id: currentId, label: labelText, shape: shape, color: color, marker: marker });
+                updateLegendDisplay();
                 isAddingMarker = false;
             } else if (isAddingAnnotation) {
                 let text = document.getElementById('input-annot-text').value.trim();
@@ -815,23 +801,33 @@
 
         window.removeCustomMarker = function(id) {
             let idx = customMarkers.findIndex(cm => cm.id === id);
-            if (idx !== -1) { map.removeLayer(customMarkers[idx].marker); customMarkers.splice(idx, 1); }
+            if (idx !== -1) { map.removeLayer(customMarkers[idx].marker); customMarkers.splice(idx, 1); updateLegendDisplay(); }
         };
 
         function exportToPNG() {
-            html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
-                let link = document.createElement('a'); link.download = 'Peta-Desa.png'; link.href = canvas.toDataURL('image/png'); link.click();
-            });
+            const btn = document.getElementById('btn-export-png');
+            let orig = btn.innerText; btn.innerText = "⏳ Memproses...";
+            setTimeout(() => {
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                    let link = document.createElement('a'); link.download = 'Peta-Desa.png'; link.href = canvas.toDataURL('image/png'); link.click();
+                    btn.innerText = orig;
+                });
+            }, 500);
         }
 
         function exportToPDF() {
-            html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
-                const imgData = canvas.toDataURL('image/png'); 
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF('l', 'mm', 'a4');
-                pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
-                pdf.save('Peta-Desa.pdf');
-            });
+            const btn = document.getElementById('btn-export-pdf');
+            let orig = btn.innerText; btn.innerText = "⏳ Memproses...";
+            setTimeout(() => {
+                html2canvas(document.getElementById('layoutSheet'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png'); 
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('l', 'mm', 'a4');
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
+                    pdf.save('Peta-Desa.pdf');
+                    btn.innerText = orig;
+                });
+            }, 500);
         }
     </script>
 </body>

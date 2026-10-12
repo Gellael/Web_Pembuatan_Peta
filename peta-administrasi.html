@@ -64,6 +64,7 @@
         .btn-pdf { background: #c0392b; } .btn-pdf:hover { background: #a93226; }
         .btn-marker { background: #2980b9; margin-bottom: 4px; } .btn-marker:hover { background: #1f618d; }
         .btn-annot { background: #8e44ad; margin-bottom: 4px; } .btn-annot:hover { background: #732d91; }
+        .btn-osm { background: #d35400; margin-top: 4px; } .btn-osm:hover { background: #ba4a00; }
 
         @media print {
             @page { size: A4 landscape; margin: 0; }
@@ -152,6 +153,18 @@
                     </select>
                 </div>
             </div>
+        </div>
+
+        <!-- STEP 3.5: FITUR TAMBAHAN OPENSTREETMAP (BANGUNAN, AIR, JALAN) -->
+        <div class="control-card">
+            <h3 class="card-step-title" style="color: #d35400;">🌐 Layer Detail OSM (Area Terpilih)</h3>
+            <div style="display: flex; gap: 5px; margin-bottom: 6px;">
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-buildings"> Bangunan</label></div>
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-water"> Aliran Air / Sungai</label></div>
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-roads"> Garis Jalan</label></div>
+            </div>
+            <button class="btn-action btn-osm" onclick="loadOsmFeaturesForCurrentArea()">Muat / Perbarui Data Detail OSM</button>
+            <small style="font-size: 8px; color: #7f8c8d; display:block; margin-top:4px;">*Pastikan sudah memilih Provinsi/Kabupaten agar area batas pencarian akurat.</small>
         </div>
 
         <!-- STEP 4: LABEL & MASKING -->
@@ -289,7 +302,6 @@
                 <input type="text" id="input-annot-text" placeholder="Misal: Lahan Kosong Rencana X">
             </div>
             <button class="btn-action btn-annot" onclick="toggleAnnotationMode()">Klik Peta untuk Taruh Gambar</button>
-            <p style="font-size: 8px; color: #7f8c8d; margin-top: 4px; line-height: 1.3;">*Gambar bisa di-klik & ditahan untuk digeser (drag) posisinya di atas peta.</p>
         </div>
 
         <button class="btn-action btn-png" id="btn-export-png" onclick="exportToPNG()" style="margin-top: 15px;">Download Kanvas Peta (PNG)</button>
@@ -346,6 +358,8 @@
     <script src="https://cdn.jsdelivr.net/npm/leaflet-latlng-graticule@1.2.0/L.latLngGraticule.js"></script>
     <!-- Turf.js -->
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <!-- osmtogeojson -->
+    <script src="https://cdn.jsdelivr.net/npm/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
     <!-- html2canvas & jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -354,10 +368,12 @@
         document.getElementById('input-judul').addEventListener('input', e => document.getElementById('header-judul').innerText = e.target.value);
         document.getElementById('input-subjudul').addEventListener('input', e => document.getElementById('header-subjudul').innerText = e.target.value);
 
-        // --- PALET WARNA UNTUK SIMBOLOGI KATEGORI WARNA-WARNI ---
         const colorPalette = ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'];
         let currentDistrictList = []; 
         let currentGeoJsonFeatures = [];
+
+        // Layer Group untuk menyimpan elemen OSM tambahan
+        let osmLayerGroup = L.layerGroup();
 
         // Kontrol Skala
         const selectSkalaMode = document.getElementById('select-skala-mode');
@@ -383,6 +399,7 @@
 
         // Inisialisasi Peta Utama
         var map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true }).setView([-0.7893, 113.9213], 5);
+        osmLayerGroup.addTo(map);
 
         const basemaps = {
             osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true }),
@@ -638,6 +655,74 @@
             })
             .catch(err => { console.error("Gagal memuat JSON:", err); });
 
+        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM (BANGUNAN, AIR, JALAN) ---
+        function loadOsmFeaturesForCurrentArea() {
+            if (!activeLayer) {
+                alert("Silakan pilih Provinsi atau Kabupaten terlebih dahulu agar area pemanggilan jelas!");
+                return;
+            }
+
+            let b = activeLayer.getBounds();
+            let bboxStr = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+
+            let wantBuildings = document.getElementById('chk-buildings').checked;
+            let wantWater = document.getElementById('chk-water').checked;
+            let wantRoads = document.getElementById('chk-roads').checked;
+
+            if (!wantBuildings && !wantWater && !wantRoads) {
+                alert("Centang minimal salah satu opsi (Bangunan, Aliran Air, atau Garis Jalan)!");
+                return;
+            }
+
+            let btn = document.querySelector('.btn-osm');
+            let origText = btn.innerText;
+            btn.innerText = "⏳ Mengunduh dari OSM...";
+
+            let queryParts = ['[out:json][timeout:30];\n('];
+            if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
+            if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
+            if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
+            queryParts.push(');\nout body;\n>;\nout skel qt;');
+
+            let query = queryParts.join('\n');
+
+            fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                body: query
+            })
+            .then(res => res.json())
+            .then(osmData => {
+                let geojson = osmtogeojson(osmData);
+                osmLayerGroup.clearLayers();
+
+                L.geoJSON(geojson, {
+                    style: function(feature) {
+                        let t = feature.properties;
+                        if (t.building) {
+                            return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
+                        } else if (t.natural === 'water' || t.waterway) {
+                            return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
+                        } else if (t.highway) {
+                            return { color: '#7f8c8d', weight: 1.0 };
+                        }
+                        return { color: '#333', weight: 1 };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
+                        layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+                    }
+                }).addTo(osmLayerGroup);
+
+                btn.innerText = origText;
+                alert("Data detail wilayah berhasil dimuat dari OpenStreetMap!");
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Gagal memuat data dari Overpass API (Mungkin area terlalu luas atau timeout). Coba perkecil area ke tingkat Kabupaten.");
+                btn.innerText = origText;
+            });
+        }
+
         // --- UPDATE TAMPILAN UTAMA & LEGENDA ---
         function updateLegend() {
             let selectedProv = selectProvinsi.value, selectedKab = selectKabupaten.value, showKabLines = selectShowKab.value === 'ya', symbology = selectSymbology.value, fillColor = inputFillColor.value;
@@ -688,6 +773,7 @@
             if (activeLayer) map.removeLayer(activeLayer);
             if (maskLayer) map.removeLayer(maskLayer);
             labelLayer.clearLayers();
+            osmLayerGroup.clearLayers();
 
             if (!selectedProv) {
                 infoWilayah.innerHTML = `<b>Wilayah:</b> Seluruh Indonesia<br><b>Proyeksi:</b> WGS 84`;
@@ -713,6 +799,10 @@
                     return { color: "#2c3e50", weight: (showKabLines || selectedKab) ? weightVal : weightVal + 0.5, dashArray: dashVal, fillColor: featColor, fillOpacity: opacityVal };
                 },
                 onEachFeature: function(feature, layer) {
+                    let p = feature.properties;
+                    let kabName = p.WADMKK || p.WADMPR;
+                    layer.bindPopup(`<b>Wilayah:</b> ${kabName}`);
+                    
                     if (showLabels && feature.properties.WADMKK) {
                         try {
                             let pt = turf.pointOnFeature(feature);
