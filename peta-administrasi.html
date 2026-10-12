@@ -160,7 +160,7 @@
             <h3 class="card-step-title" style="color: #d35400;">🌐 Layer Detail OSM (Area Terpilih)</h3>
             <div style="display: flex; gap: 5px; margin-bottom: 6px;">
                 <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-buildings"> Bangunan</label></div>
-                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-water"> Aliran Air / Sungai</label></div>
+                <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-water"> Air / Sungai</label></div>
                 <div class="form-group" style="flex: 1;"><label><input type="checkbox" id="chk-roads"> Garis Jalan</label></div>
             </div>
             <button class="btn-action btn-osm" onclick="loadOsmFeaturesForCurrentArea()">Muat / Perbarui Data Detail OSM</button>
@@ -655,13 +655,14 @@
             })
             .catch(err => { console.error("Gagal memuat JSON:", err); });
 
-        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM (BANGUNAN, AIR, JALAN) ---
-        function loadOsmFeaturesForCurrentArea() {
+        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM (TERINTEGRASI DB AIVEN) ---
+        async function loadOsmFeaturesForCurrentArea() {
             if (!activeLayer) {
                 alert("Silakan pilih Provinsi atau Kabupaten terlebih dahulu agar area pemanggilan jelas!");
                 return;
             }
 
+            let selectedAreaName = selectKabupaten.value ? `KAB_${selectKabupaten.value}` : `PROV_${selectProvinsi.value}`;
             let b = activeLayer.getBounds();
             let bboxStr = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
 
@@ -674,53 +675,83 @@
                 return;
             }
 
+            // ID unik untuk database
+            let cacheId = `${selectedAreaName}_B${wantBuildings ? 1 : 0}_W${wantWater ? 1 : 0}_R${wantRoads ? 1 : 0}`.replace(/\s+/g, '_');
+
             let btn = document.querySelector('.btn-osm');
             let origText = btn.innerText;
-            btn.innerText = "⏳ Mengunduh dari OSM...";
+            btn.innerText = "⏳ Mengecek Database (Aiven)...";
 
-            let queryParts = ['[out:json][timeout:30];\n('];
-            if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
-            if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
-            if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
-            queryParts.push(');\nout body;\n>;\nout skel qt;');
-
-            let query = queryParts.join('\n');
-
-            fetch('https://overpass-api.de/api/interpreter', {
-                method: 'POST',
-                body: query
-            })
-            .then(res => res.json())
-            .then(osmData => {
-                let geojson = osmtogeojson(osmData);
-                osmLayerGroup.clearLayers();
-
-                L.geoJSON(geojson, {
-                    style: function(feature) {
-                        let t = feature.properties;
-                        if (t.building) {
-                            return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
-                        } else if (t.natural === 'water' || t.waterway) {
-                            return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
-                        } else if (t.highway) {
-                            return { color: '#7f8c8d', weight: 1.0 };
-                        }
-                        return { color: '#333', weight: 1 };
-                    },
-                    onEachFeature: function(feature, layer) {
-                        let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
-                        layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+            try {
+                // 1. CEK CACHE DI DB
+                let cacheRes = await fetch(`/api/osm-cache?area=${cacheId}`);
+                if (cacheRes.ok) {
+                    let cacheData = await cacheRes.json();
+                    if (cacheData.success && cacheData.data) {
+                        renderOsmGeoJson(cacheData.data);
+                        btn.innerText = origText;
+                        return; // Berhenti karena data sudah diambil dari database cache
                     }
-                }).addTo(osmLayerGroup);
+                }
 
+                // 2. JIKA TIDAK ADA DI DB, AMBIL DARI OVERPASS
+                btn.innerText = "⏳ Mengunduh dari Overpass...";
+                let queryParts = ['[out:json][timeout:30];\n('];
+                if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
+                if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
+                if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
+                queryParts.push(');\nout body;\n>;\nout skel qt;');
+
+                let query = queryParts.join('\n');
+
+                let osmResponse = await fetch('https://overpass.kumi.systems/api/interpreter', {
+                    method: 'POST',
+                    body: query
+                });
+                
+                if (!osmResponse.ok) throw new Error("Overpass Timeout/Error");
+                
+                let osmData = await osmResponse.json();
+                renderOsmGeoJson(osmData);
+                
                 btn.innerText = origText;
-                alert("Data detail wilayah berhasil dimuat dari OpenStreetMap!");
-            })
-            .catch(err => {
+
+                // 3. SIMPAN KE DB AIVEN UNTUK NEXT TIME (Background Task)
+                fetch('/api/osm-cache', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ area: cacheId, osm_json: osmData })
+                });
+
+            } catch (err) {
                 console.error(err);
                 alert("Gagal memuat data dari Overpass API (Mungkin area terlalu luas atau timeout). Coba perkecil area ke tingkat Kabupaten.");
                 btn.innerText = origText;
-            });
+            }
+        }
+
+        // Fungsi Render OSM
+        function renderOsmGeoJson(osmJsonData) {
+            let geojson = osmtogeojson(osmJsonData);
+            osmLayerGroup.clearLayers();
+
+            L.geoJSON(geojson, {
+                style: function(feature) {
+                    let t = feature.properties;
+                    if (t.building) {
+                        return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
+                    } else if (t.natural === 'water' || t.waterway) {
+                        return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
+                    } else if (t.highway) {
+                        return { color: '#7f8c8d', weight: 1.0 };
+                    }
+                    return { color: '#333', weight: 1 };
+                },
+                onEachFeature: function(feature, layer) {
+                    let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
+                    layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+                }
+            }).addTo(osmLayerGroup);
         }
 
         // --- UPDATE TAMPILAN UTAMA & LEGENDA ---

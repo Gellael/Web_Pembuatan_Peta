@@ -67,7 +67,7 @@
         .map-element h4 { margin: 0 0 3px 0; font-size: 9px; border-bottom: 1px solid #000000; padding-bottom: 2px; text-align: center; font-weight: bold; color: #000000; text-transform: uppercase; }
         .north-arrow { text-align: center; font-size: 15px; font-weight: bold; }
         
-        #mini-map-box { width: 100%; height: 95px; border: 1px solid #000000; background: #fff; box-sizing: border-box; position: relative; }
+        #mini-map-box { width: 100%; height: 85px; border: 1px solid #000000; background: #fff; box-sizing: border-box; }
 
         .btn-action { color: white; border: none; padding: 8px; width: 100%; font-weight: bold; border-radius: 4px; cursor: pointer; text-align: center; margin-top: 6px; font-size: 11px; transition: background 0.2s; }
         .btn-png { background: #27ae60; } .btn-png:hover { background: #219653; }
@@ -332,8 +332,7 @@
                         <span style="display:inline-block; width:10px; height:10px; background:#3498db; opacity:0.6; border:1px solid #2980b9; vertical-align:middle;"></span> Seluruh Indonesia
                     </div>
                 </div>
-                <div class="map-element" style="padding: 2px;">
-                    <h4 style="margin-bottom: 2px;">PETA INSET</h4>
+                <div style="margin-top: auto;">
                     <div id="mini-map-box"></div>
                 </div>
             </div>
@@ -566,13 +565,14 @@
             updateMapDisplay();
         });
 
-        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM (DESA) ---
-        function loadOsmFeaturesForCurrentVillage() {
+        // --- FUNGSI DINAMIS PEMANGGILAN DATA OSM DENGAN DB AIVEN CACHE ---
+        async function loadOsmFeaturesForCurrentVillage() {
             if (!layerDesa) {
                 alert("Silakan pilih Desa terlebih dahulu agar batas area pemanggilan presisi!");
                 return;
             }
 
+            let selectedAreaName = selectDesa.value ? `DESA_${selectDesa.value.replace(/\s+/g, '_')}` : `AREA_UNKNOWN`;
             let b = layerDesa.getBounds();
             let bboxStr = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
 
@@ -585,53 +585,83 @@
                 return;
             }
 
+            // ID unik untuk database
+            let cacheId = `${selectedAreaName}_B${wantBuildings ? 1 : 0}_W${wantWater ? 1 : 0}_R${wantRoads ? 1 : 0}`.replace(/\s+/g, '_');
+
             let btn = document.querySelector('.btn-osm');
             let origText = btn.innerText;
-            btn.innerText = "⏳ Mengunduh dari OSM...";
+            btn.innerText = "⏳ Mengecek Database (Aiven)...";
 
-            let queryParts = ['[out:json][timeout:30];\n('];
-            if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
-            if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
-            if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
-            queryParts.push(');\nout body;\n>;\nout skel qt;');
-
-            let query = queryParts.join('\n');
-
-            fetch('https://overpass-api.de/api/interpreter', {
-                method: 'POST',
-                body: query
-            })
-            .then(res => res.json())
-            .then(osmData => {
-                let geojson = osmtogeojson(osmData);
-                osmLayerGroup.clearLayers();
-
-                L.geoJSON(geojson, {
-                    style: function(feature) {
-                        let t = feature.properties;
-                        if (t.building) {
-                            return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
-                        } else if (t.natural === 'water' || t.waterway) {
-                            return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
-                        } else if (t.highway) {
-                            return { color: '#7f8c8d', weight: 1.0 };
-                        }
-                        return { color: '#333', weight: 1 };
-                    },
-                    onEachFeature: function(feature, layer) {
-                        let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
-                        layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+            try {
+                // 1. CEK CACHE DI DB
+                let cacheRes = await fetch(`/api/osm-cache?area=${cacheId}`);
+                if (cacheRes.ok) {
+                    let cacheData = await cacheRes.json();
+                    if (cacheData.success && cacheData.data) {
+                        renderOsmGeoJson(cacheData.data);
+                        btn.innerText = origText;
+                        return; // Berhenti karena data sudah diambil dari database cache
                     }
-                }).addTo(osmLayerGroup);
+                }
 
+                // 2. JIKA TIDAK ADA DI DB, AMBIL DARI OVERPASS
+                btn.innerText = "⏳ Mengunduh dari Overpass...";
+                let queryParts = ['[out:json][timeout:30];\n('];
+                if (wantBuildings) queryParts.push(`  way["building"](${bboxStr});\n  relation["building"](${bboxStr});`);
+                if (wantWater) queryParts.push(`  way["natural"="water"](${bboxStr});\n  relation["natural"="water"](${bboxStr});\n  way["waterway"](${bboxStr});`);
+                if (wantRoads) queryParts.push(`  way["highway"](${bboxStr});`);
+                queryParts.push(');\nout body;\n>;\nout skel qt;');
+
+                let query = queryParts.join('\n');
+
+                let osmResponse = await fetch('https://overpass.kumi.systems/api/interpreter', {
+                    method: 'POST',
+                    body: query
+                });
+                
+                if (!osmResponse.ok) throw new Error("Overpass Timeout/Error");
+                
+                let osmData = await osmResponse.json();
+                renderOsmGeoJson(osmData);
+                
                 btn.innerText = origText;
-                alert("Data detail desa berhasil dimuat dari OpenStreetMap!");
-            })
-            .catch(err => {
+
+                // 3. SIMPAN KE DB AIVEN UNTUK NEXT TIME (Background Task)
+                fetch('/api/osm-cache', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ area: cacheId, osm_json: osmData })
+                });
+
+            } catch (err) {
                 console.error(err);
-                alert("Gagal memuat data dari Overpass API. Coba lagi beberapa saat.");
+                alert("Gagal memuat data dari Overpass API (Mungkin area terlalu luas atau timeout). Coba lagi beberapa saat.");
                 btn.innerText = origText;
-            });
+            }
+        }
+
+        // Fungsi Render OSM
+        function renderOsmGeoJson(osmJsonData) {
+            let geojson = osmtogeojson(osmJsonData);
+            osmLayerGroup.clearLayers();
+
+            L.geoJSON(geojson, {
+                style: function(feature) {
+                    let t = feature.properties;
+                    if (t.building) {
+                        return { color: '#d35400', weight: 0.5, fillColor: '#e67e22', fillOpacity: 0.6 };
+                    } else if (t.natural === 'water' || t.waterway) {
+                        return { color: '#2980b9', weight: 1.5, fillColor: '#3498db', fillOpacity: 0.7 };
+                    } else if (t.highway) {
+                        return { color: '#7f8c8d', weight: 1.0 };
+                    }
+                    return { color: '#333', weight: 1 };
+                },
+                onEachFeature: function(feature, layer) {
+                    let name = feature.properties.name || feature.properties.building || feature.properties.waterway || feature.properties.highway || 'Objek OSM';
+                    layer.bindPopup(`<b>${name}</b><br><small>Kategori OpenStreetMap</small>`);
+                }
+            }).addTo(osmLayerGroup);
         }
 
         function updateLegendDisplay() {
@@ -794,6 +824,8 @@
                 let imgBox = L.marker(offsetLatLng, { icon: L.divIcon({ className: 'custom-annot-icon', html: iconHtml, iconSize: [140, null], iconAnchor: [70, 50] }), draggable: true }).addTo(map);
                 let line = L.polyline([e.latlng, offsetLatLng], { color: '#2c3e50', weight: 2, dashArray: '4,4' }).addTo(map);
                 imgBox.on('drag', () => line.setLatLngs([anchor.getLatLng(), imgBox.getLatLng()]));
+                
+                imgBox.bindPopup(`<b>Opsi Anotasi</b><br><button onclick="removeAnnotation(${annotId})" style="margin-top:5px; background:#c0392b; color:#fff; border:none; padding:4px 8px; border-radius:3px; cursor:pointer; width:100%;">🗑️ Hapus Gambar Ini</button>`);
                 customAnnotations.push({ id: annotId, anchor: anchor, imgBox: imgBox, line: line });
                 isAddingAnnotation = false;
             }
@@ -802,6 +834,17 @@
         window.removeCustomMarker = function(id) {
             let idx = customMarkers.findIndex(cm => cm.id === id);
             if (idx !== -1) { map.removeLayer(customMarkers[idx].marker); customMarkers.splice(idx, 1); updateLegendDisplay(); }
+        };
+
+        window.removeAnnotation = function(id) {
+            let index = customAnnotations.findIndex(ca => ca.id === id);
+            if (index !== -1) { 
+                let ca = customAnnotations[index];
+                map.removeLayer(ca.anchor);
+                map.removeLayer(ca.imgBox);
+                map.removeLayer(ca.line);
+                customAnnotations.splice(index, 1); 
+            }
         };
 
         function exportToPNG() {
